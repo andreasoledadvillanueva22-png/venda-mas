@@ -1,25 +1,19 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  typescript: {
-    ignoreBuildErrors: true,
-  },
   images: {
     remotePatterns: [
       {
         protocol: 'https',
         hostname: '**.supabase.co',
-        pathname: '/storage/v1/object/public/**',
       },
       {
         protocol: 'https',
         hostname: 'images.unsplash.com',
       },
     ],
-    unoptimized: false,
   },
-  reactStrictMode: true,
-  swcMinify: true,
   compress: true,
+  reactStrictMode: true,
   poweredByHeader: false,
   headers: async () => {
     return [
@@ -40,7 +34,7 @@ const nextConfig = {
           },
         ],
       },
-    ]
+    ];
   },
   redirects: async () => {
     return [
@@ -49,8 +43,8 @@ const nextConfig = {
         destination: '/admin/analytics',
         permanent: false,
       },
-    ]
+    ];
   },
-}
+};
 
-export default nextConfig
+export default nextConfig;
