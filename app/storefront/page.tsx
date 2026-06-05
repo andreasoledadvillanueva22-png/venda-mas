@@ -3,19 +3,13 @@
 import {
   Menu,
   Search,
-  ShoppingCart,
   User,
   ArrowRight,
-  Mail,
-  Phone,
-  MapPin,
-  Star,
-  Heart,
-  Eye,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CartDrawer } from '@/components/storefront/cart-drawer'
 
 const categories = [
   { name: 'Mujer', description: 'Moda urbana y elegante', color: 'from-pink-300 to-pink-500' },
@@ -78,10 +72,7 @@ export default function StorefrontPage() {
             <button className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-900/80 text-slate-100 ring-1 ring-white/10 transition hover:bg-slate-800">
               <User className="h-5 w-5" />
             </button>
-            <button className="relative inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-900/80 text-slate-100 ring-1 ring-white/10 transition hover:bg-slate-800">
-              <ShoppingCart className="h-5 w-5" />
-              <span className="absolute -right-1 -top-1 inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-red-600 px-1.5 text-[0.65rem] font-semibold text-white">2</span>
-            </button>
+            <CartDrawer />
             <button className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-900/80 text-slate-100 ring-1 ring-white/10 transition hover:bg-slate-800 md:hidden">
               <Menu className="h-5 w-5" />
             </button>
