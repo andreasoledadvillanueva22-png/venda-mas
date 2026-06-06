@@ -1,4 +1,4 @@
-export default function ProductsLayout({
+export default function AdminProductsLayout({
   children,
 }: {
   children: React.ReactNode
