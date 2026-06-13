@@ -1,11 +1,12 @@
-'use client'
-
 import Link from 'next/link'
-import { ArrowRight, Home, Heart, PawPrint, Shield, ShoppingCart } from 'lucide-react'
-import { realProducts, formatPrice } from '@/lib/real-products'
-import { useCart } from '@/lib/cart-context'
-import { Button } from '@/components/ui/button'
+import { headers } from 'next/headers'
+import { ArrowRight, Home, Heart, PawPrint, Shield } from 'lucide-react'
+import { createClient, getUser } from '@/lib/supabase/server'
+import { getStoreBySlug } from '@/lib/tenant'
+import type { CatalogProduct } from '@/components/storefront/products-catalog'
+import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
 const categories = [
@@ -15,9 +16,123 @@ const categories = [
   { name: 'Higiene', icon: Shield, color: 'from-pink-500 to-pink-700', description: 'Cuidado personal' },
 ]
 
-export default function StorefrontPage() {
-  const { addToCart } = useCart()
-  const featuredProducts = realProducts.slice(0, 4)
+type StorefrontPageProps = {
+  searchParams: Promise<{ store?: string }>
+}
+
+type DbProduct = {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  compare_at_price: number | null
+  category: string | null
+  images: string[] | null
+  featured: boolean
+}
+
+function formatPrice(value: number) {
+  return value.toLocaleString('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  })
+}
+
+function getProductBadge(product: CatalogProduct): { label: string; className: string } | null {
+  if (product.featured) {
+    return { label: 'Destacado', className: 'bg-red-600' }
+  }
+  if (product.compareAtPrice && product.compareAtPrice > product.price) {
+    return { label: 'Oferta', className: 'bg-emerald-600' }
+  }
+  return null
+}
+
+function mapProduct(product: DbProduct): CatalogProduct {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description ?? '',
+    price: Number(product.price),
+    compareAtPrice: product.compare_at_price ? Number(product.compare_at_price) : null,
+    images: product.images ?? [],
+    category: product.category ?? '',
+    featured: product.featured,
+  }
+}
+
+async function resolveStoreId(storeSlug?: string): Promise<string | null> {
+  const headersList = await headers()
+  const storeIdFromHeader = headersList.get('x-store-id')
+
+  if (storeIdFromHeader) {
+    return storeIdFromHeader
+  }
+
+  if (storeSlug) {
+    const store = await getStoreBySlug(storeSlug)
+    return store?.id ?? null
+  }
+
+  const user = await getUser()
+
+  if (!user) {
+    return null
+  }
+
+  const supabase = await createClient()
+
+  const { data: store, error } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (error || !store) {
+    return null
+  }
+
+  return store.id
+}
+
+async function getHomepageProducts(storeId: string): Promise<CatalogProduct[]> {
+  const supabase = await createClient()
+  const selectFields =
+    'id, name, description, price, compare_at_price, category, images, featured'
+
+  const { data: featuredProducts, error: featuredError } = await supabase
+    .from('products')
+    .select(selectFields)
+    .eq('store_id', storeId)
+    .eq('active', true)
+    .eq('featured', true)
+    .order('created_at', { ascending: false })
+    .limit(4)
+
+  if (!featuredError && featuredProducts && featuredProducts.length > 0) {
+    return featuredProducts.map((product) => mapProduct(product as DbProduct))
+  }
+
+  const { data: recentProducts, error: recentError } = await supabase
+    .from('products')
+    .select(selectFields)
+    .eq('store_id', storeId)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+    .limit(4)
+
+  if (recentError || !recentProducts) {
+    return []
+  }
+
+  return recentProducts.map((product) => mapProduct(product as DbProduct))
+}
+
+export default async function StorefrontPage({ searchParams }: StorefrontPageProps) {
+  const params = await searchParams
+  const storeId = await resolveStoreId(params.store)
+  const featuredProducts = storeId ? await getHomepageProducts(storeId) : []
 
   return (
     <div>
@@ -107,58 +222,70 @@ export default function StorefrontPage() {
               Productos favoritos
             </h2>
           </div>
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {featuredProducts.map((product) => (
-              <Card key={product.id} className="group overflow-hidden transition-shadow hover:shadow-xl">
-                <Link href={`/storefront/product/${product.id}`}>
-                  <CardContent className="p-0">
-                    <div className="relative aspect-square overflow-hidden bg-slate-100">
-                      <img
-                        src={product.images[0]}
-                        alt={product.name}
-                        className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                      />
-                      {product.tag && (
-                        <Badge className={`absolute left-3 top-3 ${product.tagColor} text-white`}>
-                          {product.tag}
-                        </Badge>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h3 className="mb-2 font-semibold text-slate-900 line-clamp-2 group-hover:text-red-600">
-                        {product.name}
-                      </h3>
-                      <p className="mb-3 text-sm text-slate-500 line-clamp-2">
-                        {product.description}
-                      </p>
-                      <div className="flex items-center justify-between">
+
+          {featuredProducts.length === 0 ? (
+            <div className="mt-12 flex flex-col items-center justify-center py-12 text-center">
+              <h3 className="text-lg font-semibold text-slate-900">Próximamente</h3>
+              <p className="mt-2 text-sm text-slate-500">
+                Estamos preparando nuestro catálogo. Volvé pronto para descubrir nuestros productos.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {featuredProducts.map((product) => {
+                const badge = getProductBadge(product)
+                const imageUrl = product.images[0] ?? ''
+
+                return (
+                  <Card key={product.id} className="group overflow-hidden transition-shadow hover:shadow-xl">
+                    <CardContent className="p-0">
+                      <Link href={`/storefront/product/${product.id}`} className="block">
+                        <div className="relative aspect-square overflow-hidden bg-slate-100">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-slate-400">
+                              {product.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          {badge && (
+                            <Badge className={`absolute left-3 top-3 ${badge.className} text-white`}>
+                              {badge.label}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="p-4 pb-0">
+                          <h3 className="mb-2 line-clamp-2 font-semibold text-slate-900 group-hover:text-red-600">
+                            {product.name}
+                          </h3>
+                          <p className="mb-3 line-clamp-2 text-sm text-slate-500">
+                            {product.description}
+                          </p>
+                        </div>
+                      </Link>
+                      <div className="flex items-center justify-between p-4 pt-0">
                         <span className="text-lg font-bold text-slate-900">
                           {formatPrice(product.price)}
                         </span>
-                        <Button
-                          size="sm"
-                          className="bg-red-600 hover:bg-red-700"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            addToCart({
-                              id: product.id,
-                              name: product.name,
-                              price: product.price,
-                              image: product.images[0],
-                            })
-                          }}
-                        >
-                          <ShoppingCart className="mr-2 h-4 w-4" />
-                          Agregar
-                        </Button>
+                        <AddToCartButton
+                          productId={product.id}
+                          productName={product.name}
+                          productPrice={product.price}
+                          productImage={imageUrl}
+                          className="!h-8 !w-auto shrink-0 px-3 py-0 text-sm [&_svg]:h-4 [&_svg]:w-4"
+                        />
                       </div>
-                    </div>
-                  </CardContent>
-                </Link>
-              </Card>
-            ))}
-          </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          )}
+
           <div className="mt-12 text-center">
             <Link
               href="/storefront/products"

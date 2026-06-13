@@ -1,276 +1,116 @@
-'use client'
-
-import { useState, useMemo } from 'react'
-import Link from 'next/link'
-import { Search, ShoppingCart, Filter, X } from 'lucide-react'
-import { realProducts, formatPrice } from '@/lib/real-products'
-import { useCart } from '@/lib/cart-context'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { headers } from 'next/headers'
+import { createClient, getUser } from '@/lib/supabase/server'
+import { getStoreBySlug } from '@/lib/tenant'
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+  ProductsCatalog,
+  type CatalogProduct,
+} from '@/components/storefront/products-catalog'
 
-const categories = ['Hogar', 'Suplementos', 'Mascotas', 'Higiene']
+type ProductsPageProps = {
+  searchParams: Promise<{ store?: string }>
+}
 
-export default function ProductsPage() {
-  const [search, setSearch] = useState('')
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [priceMin, setPriceMin] = useState('')
-  const [priceMax, setPriceMax] = useState('')
-  const [sortBy, setSortBy] = useState('recent')
-  const { addToCart } = useCart()
+type DbProduct = {
+  id: string
+  name: string
+  description: string | null
+  price: number
+  compare_at_price: number | null
+  category: string | null
+  images: string[] | null
+  featured: boolean
+}
 
-  const filteredProducts = useMemo(() => {
-    let result = [...realProducts]
+async function resolveStoreId(storeSlug?: string): Promise<string | null> {
+  const headersList = await headers()
+  const storeIdFromHeader = headersList.get('x-store-id')
 
-    if (search) {
-      result = result.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-      )
-    }
+  if (storeIdFromHeader) {
+    return storeIdFromHeader
+  }
 
-    if (selectedCategories.length > 0) {
-      result = result.filter((p) => selectedCategories.includes(p.category))
-    }
+  if (storeSlug) {
+    const store = await getStoreBySlug(storeSlug)
+    return store?.id ?? null
+  }
 
-    if (priceMin) {
-      result = result.filter((p) => p.price >= Number(priceMin))
-    }
-    if (priceMax) {
-      result = result.filter((p) => p.price <= Number(priceMax))
-    }
+  const user = await getUser()
 
-    switch (sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price)
-        break
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price)
-        break
-      case 'name':
-        result.sort((a, b) => a.name.localeCompare(b.name))
-        break
-      default:
-        break
-    }
+  if (!user) {
+    return null
+  }
 
-    return result
-  }, [search, selectedCategories, priceMin, priceMax, sortBy])
+  const supabase = await createClient()
 
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
+  const { data: store, error } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (error || !store) {
+    return null
+  }
+
+  return store.id
+}
+
+function mapProduct(product: DbProduct): CatalogProduct {
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description ?? '',
+    price: Number(product.price),
+    compareAtPrice: product.compare_at_price ? Number(product.compare_at_price) : null,
+    images: product.images ?? [],
+    category: product.category ?? '',
+    featured: product.featured,
+  }
+}
+
+async function getActiveProducts(storeId: string): Promise<CatalogProduct[]> {
+  const supabase = await createClient()
+
+  const { data: products, error } = await supabase
+    .from('products')
+    .select('id, name, description, price, compare_at_price, category, images, featured')
+    .eq('store_id', storeId)
+    .eq('active', true)
+    .order('created_at', { ascending: false })
+
+  if (error || !products) {
+    return []
+  }
+
+  return products.map(mapProduct)
+}
+
+export default async function ProductsPage({ searchParams }: ProductsPageProps) {
+  const params = await searchParams
+  const storeId = await resolveStoreId(params.store)
+
+  if (!storeId) {
+    return (
+      <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-7xl">
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <h3 className="text-lg font-semibold text-foreground">Tienda no encontrada</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Accedé con el subdominio de la tienda o usá el parámetro{' '}
+              <code className="rounded bg-slate-100 px-1">?store=slug-de-tu-tienda</code>.
+            </p>
+          </div>
+        </div>
+      </div>
     )
   }
 
-  const clearFilters = () => {
-    setSearch('')
-    setSelectedCategories([])
-    setPriceMin('')
-    setPriceMax('')
-    setSortBy('recent')
-  }
+  const products = await getActiveProducts(storeId)
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Todos los productos</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'resultado' : 'resultados'}
-          </p>
-        </div>
-
-        <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-          {/* Sidebar Filtros */}
-          <aside className="space-y-6">
-            {/* Búsqueda */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
-                Buscar
-              </h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  placeholder="Nombre del producto..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
-                />
-              </div>
-            </div>
-
-            {/* Categorías con checkboxes nativos */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
-                Categorías
-              </h3>
-              <div className="space-y-2">
-                {categories.map((category) => (
-                  <label
-                    key={category}
-                    className="flex items-center gap-2 text-sm text-foreground cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedCategories.includes(category)}
-                      onChange={() => toggleCategory(category)}
-                      className="h-4 w-4 rounded border-gray-300 text-red-600 focus:ring-red-500"
-                    />
-                    {category}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Precio */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
-                Precio
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="price-min" className="text-xs">Mínimo</Label>
-                  <Input
-                    id="price-min"
-                    type="number"
-                    placeholder="0"
-                    value={priceMin}
-                    onChange={(e) => setPriceMin(e.target.value)}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="price-max" className="text-xs">Máximo</Label>
-                  <Input
-                    id="price-max"
-                    type="number"
-                    placeholder="150000"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(e.target.value)}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Limpiar filtros */}
-            {(search || selectedCategories.length > 0 || priceMin || priceMax) && (
-              <Button
-                variant="outline"
-                onClick={clearFilters}
-                className="w-full"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Limpiar filtros
-              </Button>
-            )}
-          </aside>
-
-          {/* Grid de Productos */}
-          <div>
-            {/* Ordenar */}
-            <div className="mb-6 flex justify-end">
-              <Select value={sortBy} onValueChange={(value) => setSortBy(value)}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">Más recientes</SelectItem>
-                  <SelectItem value="price-asc">Precio: menor a mayor</SelectItem>
-                  <SelectItem value="price-desc">Precio: mayor a menor</SelectItem>
-                  <SelectItem value="name">Nombre A-Z</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Productos */}
-            {filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Filter className="mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="text-lg font-semibold text-foreground">
-                  No se encontraron productos
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Intentá ajustar los filtros o la búsqueda
-                </p>
-                <Button variant="outline" onClick={clearFilters} className="mt-4">
-                  Limpiar filtros
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredProducts.map((product) => (
-                  <Link
-                    key={product.id}
-                    href={`/storefront/product/${product.id}`}
-                    className="group"
-                  >
-                    <Card className="overflow-hidden transition-shadow hover:shadow-lg">
-                      <CardContent className="p-0">
-                        {/* Imagen */}
-                        <div className="relative aspect-square overflow-hidden bg-slate-100">
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                          />
-                          {product.tag && (
-                            <Badge
-                              className={`absolute left-3 top-3 ${product.tagColor} text-white`}
-                            >
-                              {product.tag}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="p-4">
-                          <h3 className="mb-2 font-semibold text-foreground group-hover:text-primary">
-                            {product.name}
-                          </h3>
-                          <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
-                            {product.description}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-foreground">
-                              {formatPrice(product.price)}
-                            </span>
-                            <Button
-                              size="sm"
-                              className="bg-red-600 hover:bg-red-700"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                addToCart({
-                                  id: product.id,
-                                  name: product.name,
-                                  price: product.price,
-                                  image: product.images[0],
-                                })
-                              }}
-                            >
-                              <ShoppingCart className="mr-2 h-4 w-4" />
-                              Agregar
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <ProductsCatalog products={products} />
       </div>
     </div>
   )

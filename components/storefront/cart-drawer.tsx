@@ -2,9 +2,10 @@
 
 import { X, Trash2, Plus, Minus, ShoppingBag } from 'lucide-react'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
+import { buttonVariants, Button } from '@/components/ui/button'
 import { useCart } from '@/lib/cart-context'
 import { formatPrice } from '@/lib/real-products'
+import { cn } from '@/lib/utils'
 
 export function CartDrawer() {
   const { items, isCartOpen, setIsCartOpen, removeFromCart, updateQuantity, subtotal, totalItems } = useCart()
@@ -40,13 +41,13 @@ export function CartDrawer() {
           <div className="flex h-full flex-col items-center justify-center gap-4 p-4 text-center">
             <ShoppingBag className="h-12 w-12 text-slate-300" />
             <p className="text-slate-600">Tu carrito está vacío</p>
-            <Button
-              variant="outline"
+            <Link
+              href="/storefront/products"
               onClick={() => setIsCartOpen(false)}
-              asChild
+              className={cn(buttonVariants({ variant: 'outline' }))}
             >
-              <Link href="/storefront/products">Seguir comprando</Link>
-            </Button>
+              Seguir comprando
+            </Link>
           </div>
         ) : (
           <div className="flex h-full flex-col">
@@ -133,22 +134,22 @@ export function CartDrawer() {
 
               {/* Buttons */}
               <div className="space-y-2">
-                <Button
-                  size="lg"
-                  className="w-full bg-red-600 hover:bg-red-700"
-                  asChild
+                <Link
+                  href="/storefront/checkout"
+                  className={cn(
+                    buttonVariants({ size: 'lg' }),
+                    'w-full bg-red-600 hover:bg-red-700',
+                  )}
                 >
-                  <Link href="/storefront/checkout">Ir al checkout</Link>
-                </Button>
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full"
+                  Ir al checkout
+                </Link>
+                <Link
+                  href="/storefront/products"
                   onClick={() => setIsCartOpen(false)}
-                  asChild
+                  className={cn(buttonVariants({ variant: 'outline', size: 'lg' }), 'w-full')}
                 >
-                  <Link href="/storefront/products">Seguir comprando</Link>
-                </Button>
+                  Seguir comprando
+                </Link>
               </div>
             </div>
           </div>

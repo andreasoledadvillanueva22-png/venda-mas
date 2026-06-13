@@ -1,18 +1,29 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+
+function getRedirectPath(searchParams: URLSearchParams): string {
+  const redirect = searchParams.get('redirect')
+
+  if (redirect && redirect.startsWith('/') && !redirect.startsWith('//')) {
+    return redirect
+  }
+
+  return '/admin'
+}
 
 export default function LoginPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const supabase = createClient()
   
   const [email, setEmail] = useState('')
@@ -28,7 +39,7 @@ export default function LoginPage() {
 
     try {
       const { data, error: authError } = await supabase.auth.signInWithPassword({
-        email,
+        email: email.trim(),
         password,
       })
 
@@ -42,7 +53,9 @@ export default function LoginPage() {
       }
 
       if (data.user) {
-        router.push('/admin')
+        const redirectTo = getRedirectPath(searchParams)
+        router.refresh()
+        router.push(redirectTo)
       }
     } catch (err) {
       setError('Ocurrió un error inesperado')

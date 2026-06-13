@@ -3,17 +3,111 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, User, Store, Eye, EyeOff, Loader2, Check } from 'lucide-react'
+import type { SupabaseClient, User as AuthUser } from '@supabase/supabase-js'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
+
+function slugify(text: string): string {
+  const slug = text
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 50)
+
+  return slug || 'tienda'
+}
+
+async function isSlugTaken(supabase: SupabaseClient, slug: string): Promise<boolean> {
+  const [{ data: store }, { data: profile }] = await Promise.all([
+    supabase.from('stores').select('id').eq('slug', slug).maybeSingle(),
+    supabase.from('profiles').select('id').eq('store_slug', slug).maybeSingle(),
+  ])
+
+  return Boolean(store || profile)
+}
+
+async function generateUniqueStoreSlug(
+  supabase: SupabaseClient,
+  storeName: string,
+): Promise<string> {
+  const base = slugify(storeName)
+  let slug = base
+  let counter = 0
+
+  while (await isSlugTaken(supabase, slug)) {
+    counter += 1
+    slug = `${base}-${counter}`
+  }
+
+  return slug
+}
+
+function mapAuthError(message: string): string {
+  if (message.includes('already registered') || message.includes('already been registered')) {
+    return 'Este email ya está registrado'
+  }
+  if (message.includes('Password should be at least')) {
+    return 'La contraseña debe tener al menos 6 caracteres'
+  }
+  if (message.includes('Unable to validate email') || message.includes('is invalid')) {
+    return 'Email inválido'
+  }
+  if (message.includes('Email not confirmed')) {
+    return 'Debés confirmar tu email antes de continuar'
+  }
+  return message
+}
+
+type AuthResult =
+  | { status: 'authenticated'; user: AuthUser }
+  | { status: 'pending_verification' }
+  | { status: 'error'; message: string }
+
+async function resolveAuthenticatedUser(
+  supabase: SupabaseClient,
+  email: string,
+  password: string,
+  signUpUser: AuthUser | null,
+  hasSession: boolean,
+): Promise<AuthResult> {
+  if (signUpUser && hasSession) {
+    return { status: 'authenticated', user: signUpUser }
+  }
+
+  if (!signUpUser) {
+    return { status: 'error', message: 'No se pudo crear la cuenta' }
+  }
+
+  const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    email,
+    password,
+  })
+
+  if (signInData.user) {
+    return { status: 'authenticated', user: signInData.user }
+  }
+
+  if (signInError?.message.includes('Email not confirmed')) {
+    return { status: 'pending_verification' }
+  }
+
+  if (signInError) {
+    return { status: 'error', message: mapAuthError(signInError.message) }
+  }
+
+  return { status: 'pending_verification' }
+}
 
 export default function RegisterPage() {
   const router = useRouter()
   const supabase = createClient()
-  
+
   const [fullName, setFullName] = useState('')
   const [storeName, setStoreName] = useState('')
   const [email, setEmail] = useState('')
@@ -25,8 +119,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
+  const [pendingVerification, setPendingVerification] = useState(false)
 
-  const validateForm = () => {
+  const validateForm = (): boolean => {
     if (!fullName.trim()) {
       setError('El nombre completo es requerido')
       return false
@@ -54,10 +149,39 @@ export default function RegisterPage() {
     return true
   }
 
+  const createProfileAndStore = async (userId: string, userEmail: string) => {
+    const trimmedFullName = fullName.trim()
+    const trimmedStoreName = storeName.trim()
+    const storeSlug = await generateUniqueStoreSlug(supabase, trimmedStoreName)
+
+    const { error: profileError } = await supabase.from('profiles').insert({
+      id: userId,
+      email: userEmail,
+      full_name: trimmedFullName,
+      store_name: trimmedStoreName,
+      store_slug: storeSlug,
+      role: 'owner',
+    })
+
+    if (profileError) {
+      throw new Error(profileError.message)
+    }
+
+    const { error: storeError } = await supabase.from('stores').insert({
+      owner_id: userId,
+      name: trimmedStoreName,
+      slug: storeSlug,
+    })
+
+    if (storeError) {
+      throw new Error(storeError.message)
+    }
+  }
+
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    
+
     if (!validateForm()) {
       return
     }
@@ -65,38 +189,82 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
+      const trimmedEmail = email.trim()
+
       const { data, error: authError } = await supabase.auth.signUp({
-        email,
+        email: trimmedEmail,
         password,
         options: {
           data: {
-            full_name: fullName,
-            store_name: storeName,
+            full_name: fullName.trim(),
+            store_name: storeName.trim(),
           },
         },
       })
 
       if (authError) {
-        if (authError.message.includes('already registered')) {
-          setError('Este email ya está registrado')
-        } else {
-          setError(authError.message || 'Error al crear la cuenta')
-        }
+        setError(mapAuthError(authError.message))
         return
       }
 
-      if (data.user) {
-        setSuccess(true)
-        setTimeout(() => {
-          router.push('/admin')
-        }, 2000)
+      const authResult = await resolveAuthenticatedUser(
+        supabase,
+        trimmedEmail,
+        password,
+        data.user,
+        Boolean(data.session),
+      )
+
+      if (authResult.status === 'error') {
+        setError(authResult.message)
+        return
       }
+
+      if (authResult.status === 'pending_verification') {
+        setPendingVerification(true)
+        return
+      }
+
+      const userEmail = authResult.user.email ?? trimmedEmail
+
+      await createProfileAndStore(authResult.user.id, userEmail)
+
+      setSuccess(true)
+      router.refresh()
+      setTimeout(() => {
+        router.push('/admin')
+      }, 1500)
     } catch (err) {
-      setError('Ocurrió un error inesperado')
+      setError(err instanceof Error ? err.message : 'Ocurrió un error inesperado')
       console.error(err)
     } finally {
       setLoading(false)
     }
+  }
+
+  if (pendingVerification) {
+    return (
+      <Card className="border-0 shadow-xl">
+        <CardContent className="flex flex-col items-center justify-center py-12 space-y-4">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-blue-100">
+            <Mail className="h-8 w-8 text-blue-600" />
+          </div>
+          <div className="text-center space-y-2">
+            <h2 className="text-2xl font-bold text-slate-950">Revisá tu email</h2>
+            <p className="text-sm text-slate-600 max-w-sm">
+              Te enviamos un enlace de confirmación a <strong>{email}</strong>.
+              Al confirmar, iniciá sesión para completar la configuración de tu tienda.
+            </p>
+          </div>
+          <Link
+            href="/auth/login"
+            className="text-sm font-semibold text-red-600 hover:text-red-700 transition"
+          >
+            Ir a iniciar sesión
+          </Link>
+        </CardContent>
+      </Card>
+    )
   }
 
   if (success) {
