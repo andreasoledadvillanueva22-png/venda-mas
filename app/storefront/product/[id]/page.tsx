@@ -1,167 +1,384 @@
-'use client'
-
-import { useState, use } from 'react'
+import { use } from 'react'
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
-import { ShoppingCart, Truck, RotateCcw, Shield, ChevronRight, Minus, Plus } from 'lucide-react'
-import { realProducts, getProductById, formatPrice } from '@/lib/real-products'
-import { useCart } from '@/lib/cart-context'
+import { headers } from 'next/headers'
+import {
+  ChevronRight,
+  RotateCcw,
+  Shield,
+  Truck,
+} from 'lucide-react'
+import { createClient, getUser } from '@/lib/supabase/server'
+import { getStoreBySlug } from '@/lib/tenant'
+import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import { cn } from '@/lib/utils'
 
-export default function ProductPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = use(params)
-  const product = getProductById(id)
-  const { addToCart } = useCart()
+type ProductPageProps = {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ store?: string; image?: string }>
+}
 
-  const [quantity, setQuantity] = useState(1)
-  const [selectedImage, setSelectedImage] = useState(0)
+type DbProduct = {
+  id: string
+  store_id: string
+  name: string
+  slug: string
+  description: string | null
+  price: number
+  compare_at_price: number | null
+  category: string | null
+  stock: number
+  sku: string | null
+  images: string[] | null
+  tags: string[] | null
+  featured: boolean
+  active: boolean
+}
 
-  if (!product) {
-    notFound()
+type RelatedProduct = {
+  id: string
+  name: string
+  price: number
+  image: string | null
+}
+
+type ProductDetail = {
+  product: DbProduct
+  relatedProducts: RelatedProduct[]
+}
+
+function formatPrice(value: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function calculateDiscountPercent(price: number, compareAtPrice: number | null): number | null {
+  if (!compareAtPrice || compareAtPrice <= price) {
+    return null
   }
 
-  const relatedProducts = realProducts.filter(
-    (p) => p.category === product.category && p.id !== product.id
-  )
+  return Math.round((1 - price / compareAtPrice) * 100)
+}
+
+async function resolveStoreId(storeSlug?: string): Promise<string | null> {
+  const headersList = await headers()
+  const storeIdFromHeader = headersList.get('x-store-id')
+
+  if (storeIdFromHeader) {
+    return storeIdFromHeader
+  }
+
+  if (storeSlug) {
+    const store = await getStoreBySlug(storeSlug)
+    return store?.id ?? null
+  }
+
+  const user = await getUser()
+
+  if (!user) {
+    return null
+  }
+
+  const supabase = await createClient()
+
+  const { data: store, error } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (error || !store) {
+    return null
+  }
+
+  return store.id
+}
+
+async function getProductDetail(
+  productId: string,
+  tenantStoreId: string | null,
+): Promise<ProductDetail | null> {
+  const supabase = await createClient()
+
+  let productQuery = supabase
+    .from('products')
+    .select(
+      'id, store_id, name, slug, description, price, compare_at_price, category, stock, sku, images, tags, featured, active',
+    )
+    .eq('id', productId)
+    .eq('active', true)
+
+  if (tenantStoreId) {
+    productQuery = productQuery.eq('store_id', tenantStoreId)
+  }
+
+  const { data: product, error: productError } = await productQuery.maybeSingle()
+
+  if (productError || !product) {
+    return null
+  }
+
+  const dbProduct = product as DbProduct
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('id', dbProduct.store_id)
+    .maybeSingle()
+
+  if (storeError || !store) {
+    return null
+  }
+
+  let relatedProducts: RelatedProduct[] = []
+
+  if (dbProduct.category) {
+    const { data: related, error: relatedError } = await supabase
+      .from('products')
+      .select('id, name, price, images')
+      .eq('store_id', dbProduct.store_id)
+      .eq('active', true)
+      .eq('category', dbProduct.category)
+      .neq('id', dbProduct.id)
+      .order('created_at', { ascending: false })
+      .limit(4)
+
+    if (!relatedError && related) {
+      relatedProducts = related.map((item) => ({
+        id: item.id,
+        name: item.name,
+        price: Number(item.price),
+        image: item.images?.[0] ?? null,
+      }))
+    }
+  }
+
+  return {
+    product: dbProduct,
+    relatedProducts,
+  }
+}
+
+function buildProductPath(productId: string, storeSlug?: string, imageIndex?: number) {
+  const params = new URLSearchParams()
+
+  if (storeSlug) {
+    params.set('store', storeSlug)
+  }
+
+  if (imageIndex !== undefined && imageIndex > 0) {
+    params.set('image', String(imageIndex))
+  }
+
+  const query = params.toString()
+  return query
+    ? `/storefront/product/${productId}?${query}`
+    : `/storefront/product/${productId}`
+}
+
+export default function ProductPage({ params, searchParams }: ProductPageProps) {
+  const { id } = use(params)
+  const query = use(searchParams)
+  const tenantStoreId = use(resolveStoreId(query.store))
+  const detail = use(getProductDetail(id, tenantStoreId))
+
+  const selectedImageIndex = Math.max(0, Number(query.image ?? 0) || 0)
+
+  if (!detail) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-white px-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-2xl font-bold text-foreground">Producto no disponible</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            El producto que buscás no existe, no está activo o no pertenece a esta tienda.
+          </p>
+          <Link
+            href={
+              query.store
+                ? `/storefront/products?store=${encodeURIComponent(query.store)}`
+                : '/storefront/products'
+            }
+            className={cn(buttonVariants(), 'mt-6 bg-red-600 text-white hover:bg-red-700')}
+          >
+            Volver al catálogo
+          </Link>
+        </div>
+      </div>
+    )
+  }
+
+  const { product, relatedProducts } = detail
+  const images = product.images ?? []
+  const safeImageIndex =
+    images.length > 0 ? Math.min(selectedImageIndex, images.length - 1) : 0
+  const mainImage = images[safeImageIndex] ?? null
+  const compareAtPrice = product.compare_at_price ? Number(product.compare_at_price) : null
+  const price = Number(product.price)
+  const discountPercent = calculateDiscountPercent(price, compareAtPrice)
+  const tags = product.tags ?? []
+  const catalogHref = query.store
+    ? `/storefront/products?store=${encodeURIComponent(query.store)}`
+    : '/storefront/products'
+  const categoryHref = product.category
+    ? `${catalogHref}${catalogHref.includes('?') ? '&' : '?'}category=${encodeURIComponent(product.category)}`
+    : catalogHref
 
   return (
     <div className="min-h-screen bg-white">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-        {/* Breadcrumbs */}
         <nav className="mb-8 flex items-center gap-2 text-sm text-muted-foreground">
           <Link href="/storefront" className="hover:text-foreground">
             Inicio
           </Link>
           <ChevronRight className="h-4 w-4" />
-          <Link href={`/storefront/products?category=${product.category}`} className="hover:text-foreground">
-            {product.category}
+          <Link href={categoryHref} className="hover:text-foreground">
+            {product.category || 'Productos'}
           </Link>
           <ChevronRight className="h-4 w-4" />
           <span className="text-foreground">{product.name}</span>
         </nav>
 
         <div className="grid gap-8 lg:grid-cols-2">
-          {/* Galería de imágenes */}
           <div className="space-y-4">
             <div className="relative aspect-square overflow-hidden rounded-2xl bg-slate-100">
-              <img
-                src={product.images[selectedImage]}
-                alt={product.name}
-                className="h-full w-full object-cover"
-              />
-              {product.tag && (
-                <Badge className={`absolute left-4 top-4 ${product.tagColor} text-white`}>
-                  {product.tag}
+              {mainImage ? (
+                <img
+                  src={mainImage}
+                  alt={product.name}
+                  className="h-full w-full object-cover"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-5xl font-semibold text-slate-400">
+                  {product.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              {product.featured && (
+                <Badge className="absolute left-4 top-4 bg-red-600 text-white">Destacado</Badge>
+              )}
+              {discountPercent !== null && (
+                <Badge className="absolute right-4 top-4 bg-emerald-600 text-white">
+                  -{discountPercent}%
                 </Badge>
               )}
             </div>
 
-            {/* Thumbnails */}
-            {product.images.length > 1 && (
+            {images.length > 1 && (
               <div className="grid grid-cols-4 gap-2">
-                {product.images.map((img, idx) => (
-                  <button
-                    key={idx}
-                    onClick={() => setSelectedImage(idx)}
-                    className={`aspect-square overflow-hidden rounded-lg border-2 transition ${
-                      selectedImage === idx ? 'border-red-600' : 'border-transparent'
-                    }`}
+                {images.map((image, index) => (
+                  <Link
+                    key={`${product.id}-${index}`}
+                    href={buildProductPath(product.id, query.store, index)}
+                    className={cn(
+                      'aspect-square overflow-hidden rounded-lg border-2 transition',
+                      safeImageIndex === index ? 'border-red-600' : 'border-transparent',
+                    )}
                   >
-                    <img src={img} alt="" className="h-full w-full object-cover" />
-                  </button>
+                    <img src={image} alt="" className="h-full w-full object-cover" />
+                  </Link>
                 ))}
               </div>
             )}
           </div>
 
-          {/* Info del producto */}
           <div className="space-y-6">
             <div>
-              <Badge variant="outline" className="mb-3">
-                {product.category}
-              </Badge>
+              {product.category && (
+                <Badge variant="outline" className="mb-3">
+                  {product.category}
+                </Badge>
+              )}
               <h1 className="text-3xl font-bold text-foreground">{product.name}</h1>
             </div>
 
-            {/* Precio */}
-            <div className="flex items-baseline gap-3">
-              <span className="text-4xl font-bold text-red-600">
-                {formatPrice(product.price)}
-              </span>
-              {product.compareAtPrice && (
-                <span className="text-xl text-muted-foreground line-through">
-                  {formatPrice(product.compareAtPrice)}
-                </span>
+            {tags.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag) => (
+                  <Badge key={tag} variant="secondary">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-baseline gap-3">
+              <span className="text-4xl font-bold text-red-600">{formatPrice(price)}</span>
+              {compareAtPrice !== null && compareAtPrice > price && (
+                <>
+                  <span className="text-xl text-muted-foreground line-through">
+                    {formatPrice(compareAtPrice)}
+                  </span>
+                  {discountPercent !== null && (
+                    <span className="text-sm font-semibold text-emerald-600">
+                      {discountPercent}% OFF
+                    </span>
+                  )}
+                </>
               )}
             </div>
 
-            {/* Descripción */}
-            <p className="text-muted-foreground">{product.description}</p>
+            {product.description && (
+              <p className="text-muted-foreground">{product.description}</p>
+            )}
 
             <Separator />
 
-            {/* Stock */}
             <div>
               <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
                 Stock
               </p>
               <p className="mt-1 text-foreground">
-                {product.stock > 0 ? `${product.stock} disponibles` : 'Agotado'}
+                {product.stock > 0 ? 'En stock' : 'Agotado'}
               </p>
             </div>
 
-            {/* Cantidad */}
-            <div>
-              <p className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                Cantidad
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                >
-                  <Minus className="h-4 w-4" />
-                </Button>
-                <span className="w-12 text-center text-lg font-semibold">{quantity}</span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setQuantity(quantity + 1)}
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
+            {(product.sku || product.category) && (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {product.category && (
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      Categoría
+                    </p>
+                    <p className="mt-1 text-foreground">{product.category}</p>
+                  </div>
+                )}
+                {product.sku && (
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                      SKU
+                    </p>
+                    <p className="mt-1 text-foreground">{product.sku}</p>
+                  </div>
+                )}
               </div>
-            </div>
+            )}
 
-            {/* Botones */}
             <div className="space-y-3">
-              <Button
-                size="lg"
-                className="w-full bg-red-600 hover:bg-red-700"
-                onClick={() => {
-                  addToCart({
-                    id: product.id,
-                    name: product.name,
-                    price: product.price,
-                    image: product.images[0],
-                  })
-                }}
+              <AddToCartButton
+                productId={product.id}
+                productName={product.name}
+                productPrice={price}
+                productImage={mainImage ?? ''}
+                stock={product.stock}
+              />
+              <Link
+                href="/storefront/checkout"
+                className={cn(
+                  buttonVariants({ variant: 'outline', size: 'lg' }),
+                  'w-full justify-center',
+                )}
               >
-                <ShoppingCart className="mr-2 h-5 w-5" />
-                Agregar al carrito
-              </Button>
-              <Button variant="outline" size="lg" className="w-full">
                 Comprar ahora
-              </Button>
+              </Link>
             </div>
 
-            {/* Beneficios */}
             <div className="space-y-3 rounded-xl border border-border p-4">
-              {product.freeShipping && (
+              {price > 50000 && (
                 <div className="flex items-center gap-3 text-sm">
                   <Truck className="h-5 w-5 text-green-600" />
                   <span className="font-semibold text-green-600">Envío gratis</span>
@@ -179,28 +396,37 @@ export default function ProductPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
 
-        {/* Productos relacionados */}
         {relatedProducts.length > 0 && (
           <div className="mt-16">
-            <h2 className="mb-6 text-2xl font-bold text-foreground">
-              También te puede interesar
-            </h2>
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {relatedProducts.map((p) => (
-                <Link key={p.id} href={`/storefront/product/${p.id}`}>
+            <h2 className="mb-6 text-2xl font-bold text-foreground">También te puede interesar</h2>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {relatedProducts.map((related) => (
+                <Link
+                  key={related.id}
+                  href={buildProductPath(related.id, query.store)}
+                >
                   <Card className="overflow-hidden transition-shadow hover:shadow-lg">
                     <CardContent className="p-0">
                       <div className="relative aspect-square overflow-hidden bg-slate-100">
-                        <img src={p.images[0]} alt={p.name} className="h-full w-full object-cover" />
-                        {p.tag && (
-                          <Badge className={`absolute left-3 top-3 ${p.tagColor} text-white`}>
-                            {p.tag}
-                          </Badge>
+                        {related.image ? (
+                          <img
+                            src={related.image}
+                            alt={related.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-3xl font-semibold text-slate-400">
+                            {related.name.charAt(0).toUpperCase()}
+                          </div>
                         )}
                       </div>
                       <div className="p-4">
-                        <h3 className="mb-2 font-semibold text-foreground">{p.name}</h3>
-                        <p className="text-lg font-bold text-foreground">{formatPrice(p.price)}</p>
+                        <h3 className="mb-2 line-clamp-2 font-semibold text-foreground">
+                          {related.name}
+                        </h3>
+                        <p className="text-lg font-bold text-foreground">
+                          {formatPrice(related.price)}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>

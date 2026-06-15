@@ -1,301 +1,335 @@
-'use client'
-
-import { useEffect, useMemo, useState } from 'react'
+import { use } from 'react'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 import {
   ArrowLeft,
-  Banknote,
-  CreditCard,
-  DollarSign,
-  ExternalLink,
   Mail,
   MapPin,
   Phone,
-  Printer,
-  Send,
   User,
 } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
+import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
 
-const orders = [
-  {
-    id: '#VM-1024',
-    date: new Date('2026-06-04T14:30:00'),
-    status: 'Pagado',
-    customer: {
-      name: 'María González',
-      email: 'maria@email.com',
-      phone: '+54 11 1234-5678',
-      document: 'DNI 34.567.890',
-    },
-    address: {
-      street: 'Av. Libertador 1234',
-      city: 'CABA',
-      province: 'Buenos Aires',
-      zip: '1428',
-      notes: 'Entregar en recepción adelante del edificio.',
-    },
-    timeline: [
-      { label: 'Creado', date: new Date('2026-06-04T14:30:00') },
-      { label: 'Pagado', date: new Date('2026-06-04T14:32:00') },
-      { label: 'Enviado', date: new Date('2026-06-05T09:15:00') },
-      { label: 'Entregado', date: new Date('2026-06-06T12:10:00') },
-    ],
-    products: [
-      { id: 'p1', name: 'Pack x3 Citrato de Magnesio', quantity: 1, price: 19900, image: '/products/magnesium.jpg' },
-      { id: 'p2', name: 'Kit Limpieza Inalámbrico', quantity: 1, price: 20000, image: '/products/cleaning-kit.jpg' },
-      { id: 'p3', name: 'Cepillo Vapor Mascotas', quantity: 1, price: 6000, image: '/products/pet-steam-brush.jpg' },
-    ],
-    shippingCost: 1000,
-    discount: 0,
-    payment: {
-      method: 'Mercado Pago',
-      status: 'Pagado',
-      transactionId: 'MP-987654321',
-      date: new Date('2026-06-04T14:32:00'),
-      url: 'https://www.mercadopago.com/operacion/MP-987654321',
-    },
-    notes: 'Cliente prefiere entrega por la tarde.',
-  },
-  {
-    id: '#VM-1023',
-    date: new Date('2026-06-04T12:15:00'),
-    status: 'Pendiente',
-    customer: {
-      name: 'Carlos Pérez',
-      email: 'carlos@email.com',
-      phone: '+54 11 9876-5432',
-      document: 'CUIT 20-12345678-9',
-    },
-    address: {
-      street: 'Calle Córdoba 456',
-      city: 'Rosario',
-      province: 'Santa Fe',
-      zip: '2000',
-      notes: '',
-    },
-    timeline: [
-      { label: 'Creado', date: new Date('2026-06-04T12:15:00') },
-      { label: 'Pagado', date: new Date('2026-06-04T12:20:00') },
-      { label: 'Enviado', date: new Date('2026-06-05T08:00:00') },
-      { label: 'Entregado', date: new Date('2026-06-06T15:30:00') },
-    ],
-    products: [
-      { id: 'p4', name: 'Kit Limpieza Inalámbrico', quantity: 1, price: 12500, image: '/products/cleaning-kit.jpg' },
-    ],
-    shippingCost: 0,
-    discount: 0,
-    payment: {
-      method: 'Transferencia',
-      status: 'Pendiente',
-      transactionId: '',
-      date: null,
-      url: '',
-    },
-    notes: '',
-  },
-  {
-    id: '#VM-1022',
-    date: new Date('2026-06-03T18:45:00'),
-    status: 'Enviado',
-    customer: {
-      name: 'Lucía Fernández',
-      email: 'lucia@email.com',
-      phone: '+54 11 1122-3344',
-      document: 'DNI 27.890.123',
-    },
-    address: {
-      street: 'Av. Santa Fe 789',
-      city: 'Córdoba',
-      province: 'Córdoba',
-      zip: '5000',
-      notes: 'Llamar antes de llegar.',
-    },
-    timeline: [
-      { label: 'Creado', date: new Date('2026-06-03T18:45:00') },
-      { label: 'Pagado', date: new Date('2026-06-03T18:50:00') },
-      { label: 'Enviado', date: new Date('2026-06-04T11:00:00') },
-      { label: 'Entregado', date: new Date('2026-06-05T16:00:00') },
-    ],
-    products: [
-      { id: 'p5', name: 'Moldes Silicona Premium', quantity: 2, price: 15000, image: '/products/silicone-molds.jpg' },
-      { id: 'p6', name: 'Cepillo Vapor Mascotas', quantity: 1, price: 15000, image: '/products/pet-steam-brush.jpg' },
-    ],
-    shippingCost: 1200,
-    discount: 0,
-    payment: {
-      method: 'Mercado Pago',
-      status: 'Pagado',
-      transactionId: 'MP-123456789',
-      date: new Date('2026-06-03T18:50:00'),
-      url: 'https://www.mercadopago.com/operacion/MP-123456789',
-    },
-    notes: 'Retira en sucursal si no encuentra al destinatario.',
-  },
-  {
-    id: '#VM-1021',
-    date: new Date('2026-06-03T10:20:00'),
-    status: 'Entregado',
-    customer: {
-      name: 'Jorge Ramírez',
-      email: 'jorge@email.com',
-      phone: '+54 11 5566-7788',
-      document: 'DNI 23.456.789',
-    },
-    address: {
-      street: 'Calle San Martín 123',
-      city: 'Mendoza',
-      province: 'Mendoza',
-      zip: '5500',
-      notes: '',
-    },
-    timeline: [
-      { label: 'Creado', date: new Date('2026-06-03T10:20:00') },
-      { label: 'Pagado', date: new Date('2026-06-03T10:25:00') },
-      { label: 'Enviado', date: new Date('2026-06-03T13:40:00') },
-      { label: 'Entregado', date: new Date('2026-06-04T11:00:00') },
-    ],
-    products: [
-      { id: 'p7', name: 'Porta Esponjas Silicona', quantity: 2, price: 5000, image: '/products/silicone-holder.jpg' },
-    ],
-    shippingCost: 900,
-    discount: 0,
-    payment: {
-      method: 'Efectivo',
-      status: 'Pagado',
-      transactionId: '',
-      date: new Date('2026-06-03T10:25:00'),
-      url: '',
-    },
-    notes: 'Entregar en horario de oficina.',
-  },
-  {
-    id: '#VM-1020',
-    date: new Date('2026-06-02T09:00:00'),
-    status: 'Cancelado',
-    customer: {
-      name: 'Ana Martínez',
-      email: 'ana@email.com',
-      phone: '+54 11 4422-1100',
-      document: 'DNI 30.123.456',
-    },
-    address: {
-      street: 'Av. San Juan 222',
-      city: 'La Plata',
-      province: 'Buenos Aires',
-      zip: '1900',
-      notes: 'No dejar en puerta.',
-    },
-    timeline: [
-      { label: 'Creado', date: new Date('2026-06-02T09:00:00') },
-      { label: 'Pagado', date: new Date('2026-06-02T09:05:00') },
-      { label: 'Enviado', date: new Date('2026-06-03T10:00:00') },
-      { label: 'Entregado', date: new Date('2026-06-04T14:00:00') },
-    ],
-    products: [
-      { id: 'p8', name: 'Pack x3 Citrato de Magnesio', quantity: 3, price: 19900, image: '/products/magnesium.jpg' },
-      { id: 'p9', name: 'Moldes Silicona Premium', quantity: 1, price: 15000, image: '/products/silicone-molds.jpg' },
-    ],
-    shippingCost: 1500,
-    discount: 0,
-    payment: {
-      method: 'Mercado Pago',
-      status: 'Cancelado',
-      transactionId: 'MP-555555555',
-      date: new Date('2026-06-02T09:05:00'),
-      url: 'https://www.mercadopago.com/operacion/MP-555555555',
-    },
-    notes: 'Pedido cancelado por cliente antes del envío.',
-  },
-]
+type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
+type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 
-function formatPrice(value: number) {
-  return value.toLocaleString('es-AR', {
-    style: 'currency',
-    currency: 'ARS',
-  })
+type DbOrder = {
+  id: string
+  store_id: string
+  customer_name: string
+  customer_email: string
+  customer_phone: string | null
+  customer_address: string | null
+  status: OrderStatus
+  payment_status: PaymentStatus
+  payment_method: string | null
+  shipping_cost: number
+  subtotal: number
+  total: number
+  discount_code: string | null
+  discount_amount: number | null
+  notes: string | null
+  created_at: string
 }
 
-function formatDateTime(date: Date | null) {
-  if (!date) return 'Sin registro'
-  return date.toLocaleString('es-AR', {
+type DbProductJoin = {
+  name: string
+  images: string[] | null
+}
+
+type DbOrderItem = {
+  id: string
+  quantity: number
+  unit_price: number
+  total: number
+  product_id: string
+  products: DbProductJoin | DbProductJoin[] | null
+}
+
+type OrderItemDetail = {
+  id: string
+  name: string
+  image: string | null
+  quantity: number
+  unitPrice: number
+  lineTotal: number
+}
+
+function getProductFromJoin(
+  products: DbProductJoin | DbProductJoin[] | null,
+): DbProductJoin | null {
+  if (!products) {
+    return null
+  }
+  return Array.isArray(products) ? (products[0] ?? null) : products
+}
+
+function mapOrderItem(item: DbOrderItem): OrderItemDetail {
+  const product = getProductFromJoin(item.products)
+
+  return {
+    id: item.id,
+    name: product?.name ?? 'Producto',
+    image: product?.images?.[0] ?? null,
+    quantity: item.quantity,
+    unitPrice: Number(item.unit_price),
+    lineTotal: Number(item.total),
+  }
+}
+
+type OrderDetailData = {
+  storeId: string
+  order: DbOrder
+  items: OrderItemDetail[]
+}
+
+const ORDER_STATUSES: OrderStatus[] = [
+  'pending',
+  'paid',
+  'shipped',
+  'delivered',
+  'cancelled',
+]
+
+type OrderDetailPageProps = {
+  params: Promise<{ id: string }>
+}
+
+function formatPrice(value: number) {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+  }).format(value)
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat('es-AR', {
     day: '2-digit',
     month: '2-digit',
     year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
     hour12: false,
-  })
+  }).format(new Date(value))
 }
 
-function statusBadgeClasses(status: string) {
+function formatOrderNumber(id: string) {
+  return `#${id.slice(0, 8).toUpperCase()}`
+}
+
+function getPaymentMethodLabel(method: string | null): string {
+  switch (method) {
+    case 'mercadopago':
+      return 'Mercado Pago'
+    case 'transfer':
+      return 'Transferencia'
+    case 'effectivo':
+      return 'Efectivo'
+    default:
+      return '—'
+  }
+}
+
+function orderStatusLabel(status: OrderStatus): string {
   switch (status) {
-    case 'Pagado':
-      return 'bg-emerald-100 text-emerald-700'
-    case 'Pendiente':
+    case 'pending':
+      return 'Pendiente'
+    case 'paid':
+      return 'Pagado'
+    case 'shipped':
+      return 'Enviado'
+    case 'delivered':
+      return 'Entregado'
+    case 'cancelled':
+      return 'Cancelado'
+    default:
+      return status
+  }
+}
+
+function paymentStatusLabel(status: PaymentStatus): string {
+  switch (status) {
+    case 'pending':
+      return 'Pendiente'
+    case 'paid':
+      return 'Pagado'
+    case 'failed':
+      return 'Fallido'
+    case 'refunded':
+      return 'Reembolsado'
+    default:
+      return status
+  }
+}
+
+function orderStatusBadgeClasses(status: OrderStatus): string {
+  switch (status) {
+    case 'pending':
       return 'bg-amber-100 text-amber-700'
-    case 'Enviado':
+    case 'paid':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'shipped':
       return 'bg-blue-100 text-blue-700'
-    case 'Entregado':
+    case 'delivered':
       return 'bg-slate-100 text-slate-700'
-    case 'Cancelado':
+    case 'cancelled':
       return 'bg-red-100 text-red-700'
     default:
       return 'bg-muted text-foreground'
   }
 }
 
-function paymentIcon(method: string) {
-  switch (method) {
-    case 'Mercado Pago':
-      return CreditCard
-    case 'Transferencia':
-      return Banknote
-    case 'Efectivo':
-      return DollarSign
+function paymentStatusBadgeClasses(status: PaymentStatus): string {
+  switch (status) {
+    case 'pending':
+      return 'bg-amber-100 text-amber-700'
+    case 'paid':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'failed':
+      return 'bg-red-100 text-red-700'
+    case 'refunded':
+      return 'bg-slate-100 text-slate-700'
     default:
-      return CreditCard
+      return 'bg-muted text-foreground'
   }
 }
 
-export default function OrderDetailPage({ params }: { params: { id: string } }) {
-  const [loading, setLoading] = useState(true)
-  const [note, setNote] = useState('')
-  const [savedNote, setSavedNote] = useState(false)
-  const [status, setStatus] = useState('')
+async function getOrderDetail(orderId: string): Promise<OrderDetailData | null | 'not_found'> {
+  const supabase = await createClient()
 
-  const order = useMemo(
-    () => orders.find((item) => item.id === params.id),
-    [params.id]
-  )
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
 
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 300)
-    return () => clearTimeout(timer)
-  }, [])
+  if (authError || !user) {
+    return null
+  }
 
-  useEffect(() => {
-    if (order) {
-      setStatus(order.status)
-    }
-  }, [order])
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('owner_id', user.id)
+    .maybeSingle()
 
-  const totalProducts = order?.products.reduce((sum, item) => sum + item.price * item.quantity, 0) ?? 0
-  const totalOrder = totalProducts + (order?.shippingCost ?? 0) - (order?.discount ?? 0)
-  const PaymentIcon = order ? paymentIcon(order.payment.method) : CreditCard
+  if (storeError || !store) {
+    return null
+  }
 
-  if (!order && !loading) {
+  const { data: order, error: orderError } = await supabase
+    .from('orders')
+    .select(
+      'id, store_id, customer_name, customer_email, customer_phone, customer_address, status, payment_status, payment_method, shipping_cost, subtotal, total, discount_code, discount_amount, notes, created_at',
+    )
+    .eq('id', orderId)
+    .eq('store_id', store.id)
+    .maybeSingle()
+
+  if (orderError || !order) {
+    return 'not_found'
+  }
+
+  const { data: orderItems, error: itemsError } = await supabase
+    .from('order_items')
+    .select(
+      'id, quantity, unit_price, total, product_id, products ( name, images )',
+    )
+    .eq('order_id', orderId)
+
+  if (itemsError) {
+    return 'not_found'
+  }
+
+  return {
+    storeId: store.id,
+    order: order as DbOrder,
+    items: (orderItems ?? []).map((item) => mapOrderItem(item as unknown as DbOrderItem)),
+  }
+}
+
+async function updateOrderStatus(formData: FormData) {
+  'use server'
+
+  const orderId = formData.get('orderId')
+  const storeId = formData.get('storeId')
+  const status = formData.get('status')
+
+  if (
+    typeof orderId !== 'string' ||
+    typeof storeId !== 'string' ||
+    typeof status !== 'string' ||
+    !ORDER_STATUSES.includes(status as OrderStatus)
+  ) {
+    return
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store) {
+    return
+  }
+
+  const { error: updateError } = await supabase
+    .from('orders')
+    .update({ status: status as OrderStatus })
+    .eq('id', orderId)
+    .eq('store_id', storeId)
+
+  if (updateError) {
+    return
+  }
+
+  revalidatePath(`/admin/orders/${orderId}`)
+  revalidatePath('/admin/orders')
+}
+
+export default function OrderDetailPage({ params }: OrderDetailPageProps) {
+  const { id } = use(params)
+  const result = use(getOrderDetail(id))
+
+  if (result === null) {
+    redirect(`/auth/login?redirect=${encodeURIComponent(`/admin/orders/${id}`)}`)
+  }
+
+  if (result === 'not_found') {
     return (
       <div className="min-h-screen bg-slate-50 p-6">
         <div className="mx-auto max-w-3xl rounded-3xl border border-border bg-white p-8 text-center shadow-sm">
-          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">Pedido no encontrado</p>
+          <p className="text-sm uppercase tracking-[0.2em] text-muted-foreground">
+            Pedido no encontrado
+          </p>
           <h1 className="mt-4 text-4xl font-semibold text-foreground">404</h1>
-          <p className="mt-4 text-sm text-muted-foreground">El pedido que estás buscando no existe o fue eliminado.</p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            El pedido que estás buscando no existe o no tenés permiso para verlo.
+          </p>
           <Link
             href="/admin/orders"
             className="mt-8 inline-flex rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
@@ -307,70 +341,67 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     )
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-6xl space-y-6">
-          <div className="h-32 rounded-3xl bg-slate-100" />
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-            <div className="space-y-6">
-              <div className="h-60 rounded-3xl bg-slate-100" />
-              <div className="h-72 rounded-3xl bg-slate-100" />
-            </div>
-            <div className="space-y-6">
-              <div className="h-40 rounded-3xl bg-slate-100" />
-              <div className="h-56 rounded-3xl bg-slate-100" />
-            </div>
-          </div>
-        </div>
-      </div>
-    )
-  }
+  const { order, items, storeId } = result
+  const discountAmount = Number(order.discount_amount ?? 0)
 
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="border-b border-border bg-white px-6 py-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="space-y-3">
-            <Link href="/admin/orders" className="inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700">
+            <Link
+              href="/admin/orders"
+              className="inline-flex items-center gap-2 text-sm font-medium text-red-600 hover:text-red-700"
+            >
               <ArrowLeft className="h-4 w-4" /> Volver a pedidos
             </Link>
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-semibold text-foreground">{order.id}</h1>
-              <span className={`rounded-full px-3 py-1 text-sm font-semibold ${statusBadgeClasses(status)}`}>
-                {status}
+              <h1 className="text-3xl font-semibold text-foreground">
+                {formatOrderNumber(order.id)}
+              </h1>
+              <span
+                className={`rounded-full px-3 py-1 text-sm font-semibold ${orderStatusBadgeClasses(order.status)}`}
+              >
+                {orderStatusLabel(order.status)}
+              </span>
+              <span
+                className={`rounded-full px-3 py-1 text-sm font-semibold ${paymentStatusBadgeClasses(order.payment_status)}`}
+              >
+                Pago: {paymentStatusLabel(order.payment_status)}
               </span>
             </div>
-            <p className="text-sm text-muted-foreground">Detalle completo del pedido, estado y seguimiento.</p>
+            <p className="text-sm text-muted-foreground">
+              Pedido del {formatDate(order.created_at)}
+            </p>
           </div>
+
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setStatus('Enviado')}>Cambiar estado</Button>
-            <Button variant="outline" onClick={() => window.print()}>
-              <Printer className="mr-2 h-4 w-4" /> Imprimir
-            </Button>
-            <Button variant="secondary" onClick={() => {
-              setSavedNote(true)
-              setTimeout(() => setSavedNote(false), 1500)
-            }}>
-              <Send className="mr-2 h-4 w-4" /> Enviar email
-            </Button>
+            {ORDER_STATUSES.map((status) => (
+              <form key={status} action={updateOrderStatus}>
+                <input type="hidden" name="orderId" value={order.id} />
+                <input type="hidden" name="storeId" value={storeId} />
+                <input type="hidden" name="status" value={status} />
+                <Button
+                  type="submit"
+                  variant={order.status === status ? 'default' : 'outline'}
+                  className={order.status === status ? 'bg-red-600 hover:bg-red-700' : ''}
+                  disabled={order.status === status}
+                >
+                  {orderStatusLabel(status)}
+                </Button>
+              </form>
+            ))}
           </div>
         </div>
       </div>
 
       <div className="space-y-6 p-6">
-        {savedNote && (
-          <div className="rounded-3xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700">
-            Email enviado correctamente.
-          </div>
-        )}
-
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_28rem]">
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Información del cliente</CardTitle>
-                <CardDescription>Datos de contacto y documento.</CardDescription>
+                <CardDescription>Datos de contacto del comprador.</CardDescription>
               </CardHeader>
               <CardContent className="space-y-5">
                 <div className="space-y-4 rounded-3xl border border-border bg-slate-50 p-4">
@@ -379,8 +410,8 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       <User className="h-5 w-5" />
                     </div>
                     <div>
-                      <p className="font-semibold text-foreground">{order.customer.name}</p>
-                      <p className="text-sm text-muted-foreground">{order.customer.document}</p>
+                      <p className="font-semibold text-foreground">{order.customer_name}</p>
+                      <p className="text-sm text-muted-foreground">{order.customer_email}</p>
                     </div>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -388,14 +419,16 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       <Mail className="mt-1 h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium text-foreground">Email</p>
-                        <p className="text-sm text-muted-foreground">{order.customer.email}</p>
+                        <p className="text-sm text-muted-foreground">{order.customer_email}</p>
                       </div>
                     </div>
                     <div className="flex items-start gap-3">
                       <Phone className="mt-1 h-4 w-4 text-muted-foreground" />
                       <div>
                         <p className="text-sm font-medium text-foreground">Teléfono</p>
-                        <p className="text-sm text-muted-foreground">{order.customer.phone}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {order.customer_phone || '—'}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -406,107 +439,106 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             <Card>
               <CardHeader>
                 <CardTitle>Dirección de envío</CardTitle>
-                <CardDescription>Datos del domicilio y notas del cliente.</CardDescription>
+                <CardDescription>Domicilio de entrega del pedido.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
+              <CardContent>
                 <div className="rounded-3xl border border-border bg-slate-50 p-4">
                   <div className="flex items-start gap-3">
                     <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
-                    <div className="space-y-2">
-                      <p className="text-sm font-medium text-foreground">{order.address.street}</p>
-                      <p className="text-sm text-muted-foreground">{order.address.city}, {order.address.province} {order.address.zip}</p>
-                    </div>
+                    <p className="text-sm text-foreground">
+                      {order.customer_address || 'Sin dirección registrada'}
+                    </p>
                   </div>
                 </div>
-                {order.address.notes ? (
-                  <div className="rounded-3xl border border-border bg-slate-50 p-4">
-                    <p className="text-sm font-medium text-foreground">Notas del cliente</p>
-                    <p className="text-sm text-muted-foreground">{order.address.notes}</p>
-                  </div>
-                ) : null}
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Timeline de estados</CardTitle>
-                <CardDescription>Registro de cada etapa del pedido.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
-                  {order.timeline.map((step, index) => {
-                    const isActive = step.label === status || (status === 'Cancelado' && step.label === 'Pagado')
-                    return (
-                      <div key={step.label} className="flex items-start gap-4">
-                        <div className="relative">
-                          <span className={`mt-1 inline-flex h-3.5 w-3.5 rounded-full ${isActive ? 'bg-red-600' : 'bg-slate-300'}`} />
-                          {index < order.timeline.length - 1 && <span className="absolute left-1/2 top-4 h-full w-px -translate-x-1/2 bg-slate-200" />}
-                        </div>
-                        <div>
-                          <p className={`font-semibold ${isActive ? 'text-foreground' : 'text-muted-foreground'}`}>{step.label}</p>
-                          <p className="text-sm text-muted-foreground">{formatDateTime(step.date)}</p>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              </CardContent>
-            </Card>
+            {order.notes ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Notas del pedido</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="rounded-3xl border border-border bg-slate-50 p-4">
+                    <p className="text-sm text-muted-foreground">{order.notes}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : null}
           </div>
 
           <div className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Productos</CardTitle>
-                <CardDescription>Resumen de los artículos del pedido.</CardDescription>
+                <CardDescription>Artículos incluidos en el pedido.</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="min-w-full text-sm">
-                    <thead>
-                      <tr className="text-left text-xs uppercase tracking-[0.2em] text-muted-foreground">
-                        <th className="px-3 py-3">Producto</th>
-                        <th className="px-3 py-3">Cantidad</th>
-                        <th className="px-3 py-3">Precio unitario</th>
-                        <th className="px-3 py-3">Subtotal</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {order.products.map((item) => (
-                        <tr key={item.id} className="border-t border-border">
-                          <td className="px-3 py-3 align-top">
+                {items.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No hay items en este pedido.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Producto</TableHead>
+                        <TableHead>Cant.</TableHead>
+                        <TableHead>P. unit.</TableHead>
+                        <TableHead>Total</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {items.map((item) => (
+                        <TableRow key={item.id}>
+                          <TableCell>
                             <div className="flex items-center gap-3">
-                              <img src={item.image} alt={item.name} className="h-10 w-10 rounded-lg object-cover" />
-                              <div>
-                                <p className="font-medium text-foreground">{item.name}</p>
+                              <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg bg-slate-100">
+                                {item.image ? (
+                                  <img
+                                    src={item.image}
+                                    alt={item.name}
+                                    className="h-full w-full object-cover"
+                                  />
+                                ) : (
+                                  <span className="text-xs font-semibold text-slate-400">
+                                    {item.name.charAt(0).toUpperCase()}
+                                  </span>
+                                )}
                               </div>
+                              <p className="font-medium text-foreground">{item.name}</p>
                             </div>
-                          </td>
-                          <td className="px-3 py-3 align-top">{item.quantity}</td>
-                          <td className="px-3 py-3 align-top">{formatPrice(item.price)}</td>
-                          <td className="px-3 py-3 align-top">{formatPrice(item.price * item.quantity)}</td>
-                        </tr>
+                          </TableCell>
+                          <TableCell>{item.quantity}</TableCell>
+                          <TableCell>{formatPrice(item.unitPrice)}</TableCell>
+                          <TableCell>{formatPrice(item.lineTotal)}</TableCell>
+                        </TableRow>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
+                    </TableBody>
+                  </Table>
+                )}
+
                 <Separator className="my-4" />
+
                 <div className="space-y-3 text-sm">
                   <div className="flex justify-between text-muted-foreground">
                     <span>Subtotal</span>
-                    <span>{formatPrice(totalProducts)}</span>
+                    <span>{formatPrice(Number(order.subtotal))}</span>
                   </div>
                   <div className="flex justify-between text-muted-foreground">
                     <span>Envío</span>
-                    <span>{formatPrice(order.shippingCost)}</span>
+                    <span>{formatPrice(Number(order.shipping_cost))}</span>
                   </div>
-                  <div className="flex justify-between text-muted-foreground">
-                    <span>Descuento</span>
-                    <span>-{formatPrice(order.discount)}</span>
-                  </div>
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>
+                        Descuento
+                        {order.discount_code ? ` (${order.discount_code})` : ''}
+                      </span>
+                      <span>-{formatPrice(discountAmount)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between border-t border-border pt-3 text-base font-semibold text-foreground">
                     <span>Total</span>
-                    <span>{formatPrice(totalOrder)}</span>
+                    <span>{formatPrice(Number(order.total))}</span>
                   </div>
                 </div>
               </CardContent>
@@ -515,61 +547,22 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
             <Card>
               <CardHeader>
                 <CardTitle>Información de pago</CardTitle>
-                <CardDescription>Detalle de la transacción y estado.</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-3 rounded-3xl border border-border bg-slate-50 px-4 py-4">
-                  <div className="rounded-2xl bg-white p-3 text-red-600 shadow-sm">
-                    <PaymentIcon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">{order.payment.method}</p>
-                    <p className="text-sm text-muted-foreground">Estado: {order.payment.status}</p>
-                  </div>
+              <CardContent className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Método</span>
+                  <span className="font-medium text-foreground">
+                    {getPaymentMethodLabel(order.payment_method)}
+                  </span>
                 </div>
-                {order.payment.transactionId ? (
-                  <div className="rounded-3xl border border-border bg-slate-50 px-4 py-4">
-                    <p className="text-sm font-medium text-foreground">ID de transacción</p>
-                    <p className="text-sm text-muted-foreground">{order.payment.transactionId}</p>
-                  </div>
-                ) : null}
-                <div className="rounded-3xl border border-border bg-slate-50 px-4 py-4">
-                  <p className="text-sm font-medium text-foreground">Fecha de pago</p>
-                  <p className="text-sm text-muted-foreground">{formatDateTime(order.payment.date)}</p>
-                </div>
-                {order.payment.url ? (
-                  <Link
-                    href={order.payment.url}
-                    target="_blank"
-                    className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-700"
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Estado del pago</span>
+                  <span
+                    className={`inline-flex rounded-full px-2 py-1 text-xs font-semibold ${paymentStatusBadgeClasses(order.payment_status)}`}
                   >
-                    <ExternalLink className="h-4 w-4" /> Ver en Mercado Pago
-                  </Link>
-                ) : null}
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Notas internas</CardTitle>
-                <CardDescription>Agrega comentarios para el equipo administrativo.</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <Label htmlFor="internal-notes">Nota</Label>
-                <textarea
-                  id="internal-notes"
-                  value={note}
-                  onChange={(event) => setNote(event.target.value)}
-                  rows={6}
-                  className="w-full rounded-2xl border border-input bg-transparent px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-ring/50"
-                  placeholder="Agrega una nota interna para el pedido"
-                />
-                <Button type="button" onClick={() => {
-                  setSavedNote(true)
-                  setTimeout(() => setSavedNote(false), 1500)
-                }}>
-                  Guardar nota
-                </Button>
+                    {paymentStatusLabel(order.payment_status)}
+                  </span>
+                </div>
               </CardContent>
             </Card>
           </div>

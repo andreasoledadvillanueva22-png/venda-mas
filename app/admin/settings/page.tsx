@@ -1,272 +1,342 @@
-'use client'
-
-import { useState, useMemo } from 'react'
-import Link from 'next/link'
-import { Search, ShoppingCart, Filter, X } from 'lucide-react'
-import { realProducts, formatPrice } from '@/lib/real-products'
-import { Badge } from '@/components/ui/badge'
+import { revalidatePath } from 'next/cache'
+import { redirect } from 'next/navigation'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Checkbox } from '@/components/ui/checkbox'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
+import { createClient } from '@/lib/supabase/server'
+import { cn } from '@/lib/utils'
 
-const categories = ['Hogar', 'Suplementos', 'Mascotas', 'Higiene']
+type DbProfile = {
+  id: string
+  email: string
+  full_name: string | null
+}
 
-export default function ProductsPage() {
-  const [search, setSearch] = useState('')
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([])
-  const [priceMin, setPriceMin] = useState('')
-  const [priceMax, setPriceMax] = useState('')
-  const [sortBy, setSortBy] = useState('recent')
+type DbStore = {
+  id: string
+  owner_id: string
+  name: string
+  slug: string
+  logo_url: string | null
+  description: string | null
+  primary_color: string | null
+  secondary_color: string | null
+}
 
-  const filteredProducts = useMemo(() => {
-    let result = [...realProducts]
+type SettingsData = {
+  email: string
+  profile: DbProfile
+  store: DbStore
+}
 
-    // Filtrar por búsqueda
-    if (search) {
-      result = result.filter((p) =>
-        p.name.toLowerCase().includes(search.toLowerCase())
-      )
-    }
+type SettingsPageProps = {
+  searchParams: Promise<{ saved?: string; error?: string }>
+}
 
-    // Filtrar por categorías
-    if (selectedCategories.length > 0) {
-      result = result.filter((p) => selectedCategories.includes(p.category))
-    }
+const DEFAULT_PRIMARY_COLOR = '#DC2626'
+const DEFAULT_SECONDARY_COLOR = '#16A34A'
 
-    // Filtrar por precio
-    if (priceMin) {
-      result = result.filter((p) => p.price >= Number(priceMin))
-    }
-    if (priceMax) {
-      result = result.filter((p) => p.price <= Number(priceMax))
-    }
+function normalizeHexColor(value: string, fallback: string): string {
+  const normalized = value.trim()
 
-    // Ordenar
-    switch (sortBy) {
-      case 'price-asc':
-        result.sort((a, b) => a.price - b.price)
-        break
-      case 'price-desc':
-        result.sort((a, b) => b.price - a.price)
-        break
-      case 'name':
-        result.sort((a, b) => a.name.localeCompare(b.name))
-        break
-      default:
-        break
-    }
-
-    return result
-  }, [search, selectedCategories, priceMin, priceMax, sortBy])
-
-  const toggleCategory = (category: string) => {
-    setSelectedCategories((prev) =>
-      prev.includes(category)
-        ? prev.filter((c) => c !== category)
-        : [...prev, category]
-    )
+  if (/^#[0-9A-Fa-f]{6}$/.test(normalized)) {
+    return normalized.toUpperCase()
   }
 
-  const clearFilters = () => {
-    setSearch('')
-    setSelectedCategories([])
-    setPriceMin('')
-    setPriceMax('')
-    setSortBy('recent')
+  return fallback
+}
+
+async function getSettingsData(): Promise<SettingsData | null> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user || !user.email) {
+    return null
   }
+
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, email, full_name')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  if (profileError || !profile) {
+    return null
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id, name, slug, logo_url, description, primary_color, secondary_color')
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    return null
+  }
+
+  return {
+    email: user.email,
+    profile: profile as DbProfile,
+    store: store as DbStore,
+  }
+}
+
+export async function saveSettings(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const fullName = formData.get('fullName')
+  const storeName = formData.get('storeName')
+  const description = formData.get('description')
+  const logoUrl = formData.get('logoUrl')
+  const primaryColor = formData.get('primaryColor')
+  const secondaryColor = formData.get('secondaryColor')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(`/admin/settings?error=${encodeURIComponent('No se pudo identificar la tienda.')}`)
+  }
+
+  if (typeof fullName !== 'string' || !fullName.trim()) {
+    redirect(`/admin/settings?error=${encodeURIComponent('El nombre completo es obligatorio.')}`)
+  }
+
+  if (typeof storeName !== 'string' || !storeName.trim()) {
+    redirect(`/admin/settings?error=${encodeURIComponent('El nombre de la tienda es obligatorio.')}`)
+  }
+
+  if (typeof primaryColor !== 'string' || typeof secondaryColor !== 'string') {
+    redirect(`/admin/settings?error=${encodeURIComponent('Los colores no son válidos.')}`)
+  }
+
+  const normalizedPrimaryColor = normalizeHexColor(primaryColor, DEFAULT_PRIMARY_COLOR)
+  const normalizedSecondaryColor = normalizeHexColor(secondaryColor, DEFAULT_SECONDARY_COLOR)
+
+  const parsedDescription =
+    typeof description === 'string' && description.trim() ? description.trim() : null
+
+  const parsedLogoUrl =
+    typeof logoUrl === 'string' && logoUrl.trim() ? logoUrl.trim() : null
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(`/admin/settings?error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`)
+  }
+
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .update({ full_name: fullName.trim() })
+    .eq('id', user.id)
+
+  if (profileError) {
+    redirect(`/admin/settings?error=${encodeURIComponent('No se pudo actualizar el perfil.')}`)
+  }
+
+  const { error: storeUpdateError } = await supabase
+    .from('stores')
+    .update({
+      name: storeName.trim(),
+      description: parsedDescription,
+      logo_url: parsedLogoUrl,
+      primary_color: normalizedPrimaryColor,
+      secondary_color: normalizedSecondaryColor,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (storeUpdateError) {
+    redirect(`/admin/settings?error=${encodeURIComponent('No se pudo actualizar la tienda.')}`)
+  }
+
+  revalidatePath('/admin/settings')
+  redirect('/admin/settings?saved=1')
+}
+
+export default async function AdminSettingsPage({ searchParams }: SettingsPageProps) {
+  const { saved, error } = await searchParams
+  const settings = await getSettingsData()
+
+  if (!settings) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { email, profile, store } = settings
+  const primaryColor = store.primary_color ?? DEFAULT_PRIMARY_COLOR
+  const secondaryColor = store.secondary_color ?? DEFAULT_SECONDARY_COLOR
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-7xl">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Todos los productos</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {filteredProducts.length} {filteredProducts.length === 1 ? 'resultado' : 'resultados'}
+    <div className="min-h-screen bg-slate-50">
+      <div className="border-b border-border bg-white px-6 py-6">
+        <div>
+          <h1 className="text-3xl font-semibold text-foreground">Configuración</h1>
+          <p className="text-sm text-muted-foreground">
+            Administrá tu perfil y la información de tu tienda.
           </p>
         </div>
+      </div>
 
-        <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
-          {/* Sidebar Filtros */}
-          <aside className="space-y-6">
-            {/* Búsqueda */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
-                Buscar
-              </h3>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+      <div className="space-y-6 p-6">
+        {saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Configuración guardada
+          </div>
+        ) : null}
+
+        {error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {error}
+          </div>
+        ) : null}
+
+        <form action={saveSettings} className="space-y-6">
+          <input type="hidden" name="storeId" value={store.id} />
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Perfil de usuario</CardTitle>
+              <CardDescription>Datos personales de tu cuenta.</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-6 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Nombre completo</Label>
                 <Input
-                  placeholder="Nombre del producto..."
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  className="pl-9"
+                  id="fullName"
+                  name="fullName"
+                  defaultValue={profile.full_name ?? ''}
+                  placeholder="Tu nombre"
+                  required
                 />
               </div>
-            </div>
 
-            {/* Categorías */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
-                Categorías
-              </h3>
               <div className="space-y-2">
-                {categories.map((category) => (
-                  <label
-                    key={category}
-                    className="flex items-center gap-2 text-sm text-foreground cursor-pointer"
-                  >
-                    <Checkbox
-                      checked={selectedCategories.includes(category)}
-                      onCheckedChange={() => toggleCategory(category)}
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  value={email}
+                  readOnly
+                  className="bg-muted text-muted-foreground"
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Configuración de la tienda</CardTitle>
+              <CardDescription>Información visible en tu storefront.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="storeName">Nombre de la tienda</Label>
+                  <Input
+                    id="storeName"
+                    name="storeName"
+                    defaultValue={store.name}
+                    placeholder="Mi tienda"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="storeSlug">Slug de la tienda</Label>
+                  <Input
+                    id="storeSlug"
+                    name="storeSlug"
+                    value={store.slug}
+                    readOnly
+                    className="bg-muted font-mono text-muted-foreground"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Descripción de la tienda</Label>
+                <textarea
+                  id="description"
+                  name="description"
+                  rows={4}
+                  defaultValue={store.description ?? ''}
+                  placeholder="Contá brevemente de qué se trata tu tienda..."
+                  className={cn(
+                    'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition',
+                    'focus-visible:border-ring focus-visible:ring-ring/50',
+                  )}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="logoUrl">URL del logo</Label>
+                <Input
+                  id="logoUrl"
+                  name="logoUrl"
+                  type="url"
+                  defaultValue={store.logo_url ?? ''}
+                  placeholder="https://ejemplo.com/logo.png"
+                />
+              </div>
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="primaryColor">Color primario</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="primaryColor"
+                      name="primaryColor"
+                      type="color"
+                      defaultValue={primaryColor}
+                      className="h-11 w-16 cursor-pointer p-1"
                     />
-                    {category}
-                  </label>
-                ))}
-              </div>
-            </div>
-
-            {/* Precio */}
-            <div>
-              <h3 className="mb-3 text-sm font-semibold uppercase tracking-wider text-foreground">
-                Precio
-              </h3>
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <Label htmlFor="price-min" className="text-xs">Mínimo</Label>
-                  <Input
-                    id="price-min"
-                    type="number"
-                    placeholder="0"
-                    value={priceMin}
-                    onChange={(e) => setPriceMin(e.target.value)}
-                  />
+                    <span className="font-mono text-sm text-muted-foreground">{primaryColor}</span>
+                  </div>
                 </div>
-                <div>
-                  <Label htmlFor="price-max" className="text-xs">Máximo</Label>
-                  <Input
-                    id="price-max"
-                    type="number"
-                    placeholder="150000"
-                    value={priceMax}
-                    onChange={(e) => setPriceMax(e.target.value)}
-                  />
+
+                <div className="space-y-2">
+                  <Label htmlFor="secondaryColor">Color secundario</Label>
+                  <div className="flex items-center gap-3">
+                    <Input
+                      id="secondaryColor"
+                      name="secondaryColor"
+                      type="color"
+                      defaultValue={secondaryColor}
+                      className="h-11 w-16 cursor-pointer p-1"
+                    />
+                    <span className="font-mono text-sm text-muted-foreground">{secondaryColor}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            {/* Limpiar filtros */}
-            {(search || selectedCategories.length > 0 || priceMin || priceMax) && (
-              <Button
-                variant="outline"
-                onClick={clearFilters}
-                className="w-full"
-              >
-                <X className="mr-2 h-4 w-4" />
-                Limpiar filtros
-              </Button>
-            )}
-          </aside>
-
-          {/* Grid de Productos */}
-          <div>
-            {/* Ordenar */}
-            <div className="mb-6 flex justify-end">
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[200px]">
-                  <SelectValue placeholder="Ordenar por" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="recent">Más recientes</SelectItem>
-                  <SelectItem value="price-asc">Precio: menor a mayor</SelectItem>
-                  <SelectItem value="price-desc">Precio: mayor a menor</SelectItem>
-                  <SelectItem value="name">Nombre A-Z</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Productos */}
-            {filteredProducts.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <Filter className="mb-4 h-12 w-12 text-muted-foreground" />
-                <h3 className="text-lg font-semibold text-foreground">
-                  No se encontraron productos
-                </h3>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Intentá ajustar los filtros o la búsqueda
-                </p>
-                <Button variant="outline" onClick={clearFilters} className="mt-4">
-                  Limpiar filtros
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                {filteredProducts.map((product) => (
-                  <Link
-                    key={product.id}
-                    href={`/storefront/product/${product.id}`}
-                    className="group"
-                  >
-                    <Card className="overflow-hidden transition-shadow hover:shadow-lg">
-                      <CardContent className="p-0">
-                        {/* Imagen */}
-                        <div className="relative aspect-square overflow-hidden bg-slate-100">
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                          />
-                          {product.tag && (
-                            <Badge
-                              className={`absolute left-3 top-3 ${product.tagColor} text-white`}
-                            >
-                              {product.tag}
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Info */}
-                        <div className="p-4">
-                          <h3 className="mb-2 font-semibold text-foreground group-hover:text-primary">
-                            {product.name}
-                          </h3>
-                          <p className="mb-3 text-sm text-muted-foreground line-clamp-2">
-                            {product.description}
-                          </p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-foreground">
-                              {formatPrice(product.price)}
-                            </span>
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                // TODO: Agregar al carrito
-                              }}
-                            >
-                              <ShoppingCart className="mr-2 h-4 w-4" />
-                              Agregar
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                ))}
-              </div>
-            )}
+          <div className="flex justify-end">
+            <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+              Guardar configuración
+            </Button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   )
