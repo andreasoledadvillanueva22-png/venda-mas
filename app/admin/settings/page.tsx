@@ -1,6 +1,8 @@
 import { revalidatePath } from 'next/cache'
+import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +24,9 @@ type DbStore = {
   description: string | null
   primary_color: string | null
   secondary_color: string | null
+  mp_access_token: string | null
+  mp_public_key: string | null
+  mp_user_id: string | null
 }
 
 type SettingsData = {
@@ -31,7 +36,12 @@ type SettingsData = {
 }
 
 type SettingsPageProps = {
-  searchParams: Promise<{ saved?: string; error?: string }>
+  searchParams: Promise<{
+    saved?: string
+    error?: string
+    mp_connected?: string
+    mp_error?: string
+  }>
 }
 
 const DEFAULT_PRIMARY_COLOR = '#DC2626'
@@ -71,7 +81,9 @@ async function getSettingsData(): Promise<SettingsData | null> {
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
-    .select('id, owner_id, name, slug, logo_url, description, primary_color, secondary_color')
+    .select(
+      'id, owner_id, name, slug, logo_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id',
+    )
     .eq('owner_id', user.id)
     .maybeSingle()
 
@@ -173,8 +185,98 @@ export async function saveSettings(formData: FormData): Promise<void> {
   redirect('/admin/settings?saved=1')
 }
 
+async function getAppOrigin(): Promise<string> {
+  const configuredOrigin = process.env.NEXT_PUBLIC_APP_URL?.trim()
+
+  if (configuredOrigin) {
+    return configuredOrigin.replace(/\/$/, '')
+  }
+
+  const headersList = await headers()
+  const host = headersList.get('x-forwarded-host') ?? headersList.get('host')
+  const protocol = headersList.get('x-forwarded-proto') ?? 'http'
+
+  if (host) {
+    return `${protocol}://${host}`
+  }
+
+  return 'http://localhost:3000'
+}
+
+function getMercadoPagoRedirectUri(appOrigin: string): string {
+  const configuredRedirectUri = process.env.NEXT_MP_REDIRECT_URI?.trim()
+
+  if (configuredRedirectUri) {
+    return configuredRedirectUri
+  }
+
+  return `${appOrigin}/api/mercadopago/auth`
+}
+
+function buildMercadoPagoAuthUrl(appOrigin: string): string {
+  const clientId = process.env.NEXT_MP_CLIENT_ID?.trim() ?? 'TU_CLIENT_ID'
+  const redirectUri = getMercadoPagoRedirectUri(appOrigin)
+  const params = new URLSearchParams({
+    client_id: clientId,
+    response_type: 'code',
+    platform_id: 'mp',
+    redirect_uri: redirectUri,
+  })
+
+  return `https://auth.mercadopago.com.ar/authorization?${params.toString()}`
+}
+
+export async function disconnectMercadoPago(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(`/admin/settings?mp_error=${encodeURIComponent('No se pudo identificar la tienda.')}`)
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(`/admin/settings?mp_error=${encodeURIComponent('No tenés permiso para desconectar Mercado Pago.')}`)
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      mp_access_token: null,
+      mp_public_key: null,
+      mp_user_id: null,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(`/admin/settings?mp_error=${encodeURIComponent('No se pudo desconectar Mercado Pago.')}`)
+  }
+
+  revalidatePath('/admin/settings')
+  redirect('/admin/settings')
+}
+
 export default async function AdminSettingsPage({ searchParams }: SettingsPageProps) {
-  const { saved, error } = await searchParams
+  const { saved, error, mp_connected, mp_error } = await searchParams
   const settings = await getSettingsData()
 
   if (!settings) {
@@ -184,6 +286,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
   const { email, profile, store } = settings
   const primaryColor = store.primary_color ?? DEFAULT_PRIMARY_COLOR
   const secondaryColor = store.secondary_color ?? DEFAULT_SECONDARY_COLOR
+  const isMercadoPagoConnected = Boolean(store.mp_access_token)
+  const mercadoPagoAuthUrl = buildMercadoPagoAuthUrl(await getAppOrigin())
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -206,6 +310,18 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
+          </div>
+        ) : null}
+
+        {mp_connected === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            ¡Mercado Pago conectado exitosamente!
+          </div>
+        ) : null}
+
+        {mp_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {mp_error}
           </div>
         ) : null}
 
@@ -337,6 +453,52 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
             </Button>
           </div>
         </form>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Medios de Pago</CardTitle>
+            <CardDescription>
+              Conectá tu cuenta de Mercado Pago para recibir pagos en tu tienda.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isMercadoPagoConnected ? (
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div className="space-y-1">
+                  <Badge className="rounded-full bg-emerald-100 px-3 py-1 text-sm font-semibold text-emerald-700">
+                    Mercado Pago Conectado
+                  </Badge>
+                  {store.mp_user_id ? (
+                    <p className="text-sm text-muted-foreground">
+                      Cuenta MP: {store.mp_user_id}
+                    </p>
+                  ) : null}
+                </div>
+                <form action={disconnectMercadoPago}>
+                  <input type="hidden" name="storeId" value={store.id} />
+                  <Button type="submit" variant="outline">
+                    Desconectar
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <div className="flex flex-col items-start gap-3">
+                <p className="text-sm text-muted-foreground">
+                  Todavía no conectaste Mercado Pago. Autorizá tu cuenta para empezar a cobrar.
+                </p>
+                <a
+                  href={mercadoPagoAuthUrl}
+                  className={cn(
+                    buttonVariants({ size: 'lg' }),
+                    'bg-red-600 text-white hover:bg-red-700',
+                  )}
+                >
+                  Conectar con Mercado Pago
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   )
