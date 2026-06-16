@@ -1,14 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { createClient } from '@/lib/supabase'
+import {
+  buildAbsoluteRedirectUrl,
+  buildAuthCallbackUrl,
+  createClient,
+  getSiteOrigin,
+} from '@/lib/supabase/client'
 import Link from 'next/link'
 
 function getRedirectPath(searchParams: URLSearchParams): string {
@@ -22,25 +27,42 @@ function getRedirectPath(searchParams: URLSearchParams): string {
 }
 
 export default function LoginPage() {
-  const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
-  
+
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [error, setError] = useState(searchParams.get('error') ?? '')
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     setLoading(true)
 
+    const origin = getSiteOrigin()
+    const redirectPath = getRedirectPath(searchParams)
+    const redirectUrl = buildAbsoluteRedirectUrl(redirectPath)
+
+    console.log('[login] submit', {
+      origin,
+      redirectPath,
+      redirectUrl,
+      email: email.trim(),
+    })
+
     try {
+      console.log('[login] calling signInWithPassword...')
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
+      })
+
+      console.log('[login] signInWithPassword result', {
+        authError: authError?.message ?? null,
+        userId: data.user?.id ?? null,
+        hasSession: Boolean(data.session),
       })
 
       if (authError) {
@@ -52,14 +74,30 @@ export default function LoginPage() {
         return
       }
 
-      if (data.user) {
-        const redirectTo = getRedirectPath(searchParams)
-        router.refresh()
-        router.push(redirectTo)
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession()
+
+      console.log('[login] getSession after signIn', {
+        sessionError: sessionError?.message ?? null,
+        hasSession: Boolean(sessionData.session),
+        cookieCount: typeof document !== 'undefined' ? document.cookie.split('; ').filter(Boolean).length : 0,
+      })
+
+      if (sessionError || !sessionData.session) {
+        setError('No se pudo establecer la sesión. Revisá la consola para más detalles.')
+        return
       }
+
+      if (data.user) {
+        console.log('[login] redirecting to', redirectUrl)
+        window.location.href = redirectUrl
+        return
+      }
+
+      console.log('[login] no user returned without error')
+      setError('No se pudo iniciar sesión')
     } catch (err) {
+      console.error('[login] unexpected error', err)
       setError('Ocurrió un error inesperado')
-      console.error(err)
     } finally {
       setLoading(false)
     }
@@ -69,20 +107,32 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
+    const redirectPath = getRedirectPath(searchParams)
+    const callbackUrl = buildAuthCallbackUrl(redirectPath)
+
+    console.log('[login] google oauth start', {
+      origin: getSiteOrigin(),
+      callbackUrl,
+    })
+
     try {
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL || window.location.origin}/auth/callback`,
+          redirectTo: callbackUrl,
         },
+      })
+
+      console.log('[login] signInWithOAuth result', {
+        authError: authError?.message ?? null,
       })
 
       if (authError) {
         setError(authError.message || 'Error al iniciar sesión con Google')
       }
     } catch (err) {
+      console.error('[login] google unexpected error', err)
       setError('Ocurrió un error inesperado')
-      console.error(err)
     } finally {
       setLoading(false)
     }

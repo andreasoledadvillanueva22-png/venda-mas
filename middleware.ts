@@ -1,15 +1,37 @@
 import { updateSession } from '@/lib/supabase/proxy'
 import { getStoreBySlug, getTenantFromHost } from '@/lib/tenant'
 import { createServerClient } from '@supabase/ssr'
+import type { CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-function copySupabaseCookies(from: NextResponse, to: NextResponse) {
+type StoredCookie = {
+  name: string
+  value: string
+  options: CookieOptions
+}
+
+function copySupabaseCookies(from: NextResponse, to: NextResponse, storedCookies: StoredCookie[]) {
+  storedCookies.forEach(({ name, value, options }) => {
+    to.cookies.set(name, value, options)
+  })
+
   from.cookies.getAll().forEach((cookie) => {
-    to.cookies.set(cookie.name, cookie.value)
+    if (!storedCookies.some((storedCookie) => storedCookie.name === cookie.name)) {
+      to.cookies.set(cookie.name, cookie.value)
+    }
   })
 }
 
+function getSafeRedirectPath(pathname: string | null): string {
+  if (pathname && pathname.startsWith('/') && !pathname.startsWith('//')) {
+    return pathname
+  }
+
+  return '/admin'
+}
+
 async function handleProtectedAuthRoutes(request: NextRequest): Promise<NextResponse> {
+  const storedCookies: StoredCookie[] = []
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
@@ -21,7 +43,11 @@ async function handleProtectedAuthRoutes(request: NextRequest): Promise<NextResp
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
+          storedCookies.length = 0
+          cookiesToSet.forEach(({ name, value, options }) => {
+            request.cookies.set(name, value)
+            storedCookies.push({ name, value, options })
+          })
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options),
@@ -42,15 +68,17 @@ async function handleProtectedAuthRoutes(request: NextRequest): Promise<NextResp
     url.pathname = '/auth/login'
     url.searchParams.set('redirect', pathname)
     const redirectResponse = NextResponse.redirect(url)
-    copySupabaseCookies(supabaseResponse, redirectResponse)
+    copySupabaseCookies(supabaseResponse, redirectResponse, storedCookies)
     return redirectResponse
   }
 
   if (pathname === '/auth/login' && user) {
     const url = request.nextUrl.clone()
-    url.pathname = '/admin'
+    url.pathname = getSafeRedirectPath(url.searchParams.get('redirect'))
+    url.searchParams.delete('redirect')
+    url.searchParams.delete('error')
     const redirectResponse = NextResponse.redirect(url)
-    copySupabaseCookies(supabaseResponse, redirectResponse)
+    copySupabaseCookies(supabaseResponse, redirectResponse, storedCookies)
     return redirectResponse
   }
 
@@ -80,7 +108,10 @@ async function withTenantHeader(
     request: { headers: requestHeaders },
   })
 
-  copySupabaseCookies(response, nextResponse)
+  response.cookies.getAll().forEach((cookie) => {
+    nextResponse.cookies.set(cookie.name, cookie.value)
+  })
+
   return nextResponse
 }
 
@@ -104,14 +135,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
-     * Feel free to modify this pattern to include more paths.
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
