@@ -1,13 +1,24 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
-import { ArrowRight, Home, Heart, PawPrint, Shield } from 'lucide-react'
+import type { Metadata } from 'next'
+import {
+  ArrowRight,
+  Home,
+  Heart,
+  PawPrint,
+  Shield,
+  Star,
+  CheckCircle2,
+  Store,
+} from 'lucide-react'
 import { createClient, getUser } from '@/lib/supabase/server'
-import { getStoreBySlug } from '@/lib/tenant'
 import type { CatalogProduct } from '@/components/storefront/products-catalog'
 import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+
+const BRAND_RED = '#FC0303'
 
 const categories = [
   { name: 'Hogar', icon: Home, color: 'from-blue-500 to-blue-700', description: 'Productos para tu hogar' },
@@ -16,8 +27,54 @@ const categories = [
   { name: 'Higiene', icon: Shield, color: 'from-pink-500 to-pink-700', description: 'Cuidado personal' },
 ]
 
+const testimonials = [
+  {
+    name: 'María González',
+    city: 'Buenos Aires',
+    comment:
+      'Excelente atención y los productos llegaron en perfecto estado. Super recomendable para comprar online.',
+  },
+  {
+    name: 'Carlos Ruiz',
+    city: 'Rosario',
+    comment:
+      'Compré suplementos y el envío fue rapidísimo. Muy buena experiencia de compra, volveré a pedir.',
+  },
+  {
+    name: 'Lucía Fernández',
+    city: 'Mendoza',
+    comment:
+      'Precios accesibles y pago con Mercado Pago sin problemas. La calidad superó mis expectativas.',
+  },
+]
+
+const samplePurchaseProfiles = [
+  { customer: 'María', city: 'Córdoba' },
+  { customer: 'Ana', city: 'La Plata' },
+  { customer: 'Pedro', city: 'Tucumán' },
+  { customer: 'Juan', city: 'Rosario' },
+  { customer: 'Sofía', city: 'Mar del Plata' },
+]
+
+const POPUP_PRODUCT_LIMIT = 5
+const POPUP_ROTATION_SECONDS = 20
+const POPUP_VISIBLE_SECONDS = 5
+
+type RecentPurchaseNotification = {
+  customer: string
+  city: string
+  productName: string
+  minutes: number
+}
+
 type StorefrontPageProps = {
   searchParams: Promise<{ store?: string }>
+}
+
+type StoreInfo = {
+  id: string
+  name: string
+  heroImageUrl: string | null
 }
 
 type DbProduct = {
@@ -62,17 +119,61 @@ function mapProduct(product: DbProduct): CatalogProduct {
   }
 }
 
-async function resolveStoreId(storeSlug?: string): Promise<string | null> {
+function shuffleProducts<T>(items: T[]): T[] {
+  const shuffled = [...items]
+
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(Math.random() * (index + 1))
+    ;[shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]]
+  }
+
+  return shuffled
+}
+
+function getRandomPurchaseMinutes(): number {
+  return Math.floor(Math.random() * (30 - 5 + 1)) + 5
+}
+
+async function resolveStore(storeSlug?: string): Promise<StoreInfo | null> {
   const headersList = await headers()
   const storeIdFromHeader = headersList.get('x-store-id')
 
   if (storeIdFromHeader) {
-    return storeIdFromHeader
+    const supabase = await createClient()
+    const { data: store, error } = await supabase
+      .from('stores')
+      .select('id, name, hero_image_url')
+      .eq('id', storeIdFromHeader)
+      .maybeSingle()
+
+    if (error || !store) {
+      return null
+    }
+
+    return {
+      id: store.id,
+      name: store.name,
+      heroImageUrl: store.hero_image_url ?? null,
+    }
   }
 
   if (storeSlug) {
-    const store = await getStoreBySlug(storeSlug)
-    return store?.id ?? null
+    const supabase = await createClient()
+    const { data: store, error } = await supabase
+      .from('stores')
+      .select('id, name, hero_image_url')
+      .eq('slug', storeSlug)
+      .maybeSingle()
+
+    if (error || !store) {
+      return null
+    }
+
+    return {
+      id: store.id,
+      name: store.name,
+      heroImageUrl: store.hero_image_url ?? null,
+    }
   }
 
   const user = await getUser()
@@ -85,7 +186,7 @@ async function resolveStoreId(storeSlug?: string): Promise<string | null> {
 
   const { data: store, error } = await supabase
     .from('stores')
-    .select('id')
+    .select('id, name, hero_image_url')
     .eq('owner_id', user.id)
     .maybeSingle()
 
@@ -93,7 +194,11 @@ async function resolveStoreId(storeSlug?: string): Promise<string | null> {
     return null
   }
 
-  return store.id
+  return {
+    id: store.id,
+    name: store.name,
+    heroImageUrl: store.hero_image_url ?? null,
+  }
 }
 
 async function getHomepageProducts(storeId: string): Promise<CatalogProduct[]> {
@@ -129,33 +234,236 @@ async function getHomepageProducts(storeId: string): Promise<CatalogProduct[]> {
   return recentProducts.map((product) => mapProduct(product as DbProduct))
 }
 
+function isPromoProduct(product: CatalogProduct): boolean {
+  return Boolean(product.compareAtPrice && product.compareAtPrice > product.price)
+}
+
+async function getPopupProducts(storeId: string): Promise<CatalogProduct[]> {
+  const supabase = await createClient()
+
+  const { data: products, error } = await supabase
+    .from('products')
+    .select('id, name, description, price, compare_at_price, category, images, featured')
+    .eq('store_id', storeId)
+    .eq('active', true)
+
+  if (error || !products || products.length === 0) {
+    return []
+  }
+
+  const catalogProducts = products.map((product) => mapProduct(product as DbProduct))
+
+  return shuffleProducts(catalogProducts).slice(0, POPUP_PRODUCT_LIMIT)
+}
+
+function buildRecentPurchaseNotifications(
+  products: CatalogProduct[],
+): RecentPurchaseNotification[] {
+  if (products.length === 0) {
+    return []
+  }
+
+  return products.map((product, index) => {
+    const profile = samplePurchaseProfiles[index % samplePurchaseProfiles.length]
+
+    return {
+      customer: profile.customer,
+      city: profile.city,
+      productName: product.name,
+      minutes: getRandomPurchaseMinutes(),
+    }
+  })
+}
+
+async function getPromoProducts(storeId: string): Promise<CatalogProduct[]> {
+  const supabase = await createClient()
+  const selectFields =
+    'id, name, description, price, compare_at_price, category, images, featured'
+
+  const { data: products, error } = await supabase
+    .from('products')
+    .select(selectFields)
+    .eq('store_id', storeId)
+    .eq('active', true)
+    .not('compare_at_price', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(12)
+
+  if (error || !products) {
+    return []
+  }
+
+  return products
+    .map((product) => mapProduct(product as DbProduct))
+    .filter(isPromoProduct)
+    .slice(0, 3)
+}
+
+function buildKeywords(storeName: string): string {
+  const categoryKeywords = categories.map((category) => category.name).join(', ')
+  return `tienda online, compra online, envío gratis, Argentina, ${categoryKeywords}, ${storeName}`
+}
+
+export async function generateMetadata({ searchParams }: StorefrontPageProps): Promise<Metadata> {
+  const params = await searchParams
+  const store = await resolveStore(params.store)
+  const storeName = store?.name ?? 'Tienda Online'
+
+  return {
+    title: `${storeName} - Tienda Online con Envío a Toda Argentina`,
+    description:
+      'Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago.',
+    keywords: buildKeywords(storeName),
+  }
+}
+
+function HeroVisual({
+  storeName,
+  heroImageUrl,
+}: {
+  storeName: string
+  heroImageUrl: string | null
+}) {
+  if (heroImageUrl) {
+    return (
+      <img
+        src={heroImageUrl}
+        alt={`Imagen principal de ${storeName}`}
+        className="aspect-[4/3] w-full rounded-2xl object-cover shadow-md lg:aspect-square"
+      />
+    )
+  }
+
+  return (
+    <div className="flex aspect-[4/3] w-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-8 text-center shadow-md lg:aspect-square">
+      <div
+        className="flex h-20 w-20 items-center justify-center rounded-full"
+        style={{ backgroundColor: `${BRAND_RED}15` }}
+      >
+        <Store className="h-10 w-10" style={{ color: BRAND_RED }} />
+      </div>
+      <p className="mt-5 text-2xl font-bold text-slate-900">{storeName}</p>
+      <p className="mt-2 text-sm text-slate-500">Tu tienda online de confianza</p>
+    </div>
+  )
+}
+
+function StarRating() {
+  return (
+    <div className="flex gap-0.5" aria-label="5 estrellas">
+      {Array.from({ length: 5 }).map((_, index) => (
+        <Star key={index} className="h-4 w-4 fill-amber-400 text-amber-400" />
+      ))}
+    </div>
+  )
+}
+
+function RecentPurchaseNotifications({
+  notifications,
+}: {
+  notifications: RecentPurchaseNotification[]
+}) {
+  if (notifications.length === 0) {
+    return null
+  }
+
+  const cycleDurationSeconds = notifications.length * POPUP_ROTATION_SECONDS
+  const visibleKeyframePercent = (POPUP_VISIBLE_SECONDS / cycleDurationSeconds) * 100
+
+  return (
+    <>
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @keyframes recentPurchasePopup {
+              0%, ${visibleKeyframePercent}% {
+                opacity: 1;
+                transform: translateY(0);
+                visibility: visible;
+              }
+              ${visibleKeyframePercent + 0.01}%, 100% {
+                opacity: 0;
+                transform: translateY(16px);
+                visibility: hidden;
+              }
+            }
+            .recent-purchase-notification {
+              animation: recentPurchasePopup ${cycleDurationSeconds}s infinite;
+            }
+          `,
+        }}
+      />
+      <div className="pointer-events-none fixed bottom-6 left-4 z-50 h-28 w-[min(calc(100vw-2rem),20rem)] sm:left-6">
+        {notifications.map((purchase, index) => (
+          <div
+            key={`${purchase.customer}-${purchase.productName}-${index}`}
+            className="recent-purchase-notification absolute inset-x-0 bottom-0 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+            style={{ animationDelay: `${index * POPUP_ROTATION_SECONDS}s` }}
+          >
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
+              <p className="text-sm leading-snug text-slate-700">
+                <span className="font-semibold text-slate-900">{purchase.customer}</span> de{' '}
+                <span className="font-semibold text-slate-900">{purchase.city}</span> compró{' '}
+                <span className="font-semibold text-slate-900">{purchase.productName}</span> hace{' '}
+                {purchase.minutes} minutos
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
 export default async function StorefrontPage({ searchParams }: StorefrontPageProps) {
   const params = await searchParams
-  const storeId = await resolveStoreId(params.store)
-  const featuredProducts = storeId ? await getHomepageProducts(storeId) : []
+  const store = await resolveStore(params.store)
+  const storeName = store?.name ?? 'Tu Tienda'
+  const heroImageUrl = store?.heroImageUrl ?? null
+  const featuredProducts = store ? await getHomepageProducts(store.id) : []
+  const promoProducts = store ? await getPromoProducts(store.id) : []
+  const popupProducts = store ? await getPopupProducts(store.id) : []
+  const recentPurchaseNotifications = buildRecentPurchaseNotifications(popupProducts)
+  const promoSectionProducts =
+    promoProducts.length > 0 ? promoProducts : featuredProducts.slice(0, 3)
 
   return (
     <div>
+      <RecentPurchaseNotifications notifications={recentPurchaseNotifications} />
+
       {/* HERO */}
-      <section className="relative overflow-hidden bg-slate-900 text-white">
-        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-purple-900 opacity-90" />
-        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-28 lg:px-8 lg:py-36">
+      <section className="overflow-hidden bg-gray-50">
+        <div
+          className="py-3 text-center text-sm font-semibold tracking-wide text-white sm:text-base"
+          style={{ backgroundColor: BRAND_RED }}
+        >
+          ENVÍO GRATIS en compras superiores a $45.000
+        </div>
+
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div className="space-y-6">
-              <Badge variant="outline" className="border-white/30 text-white">
+              <Badge
+                variant="outline"
+                className="border-slate-300 bg-white text-slate-700"
+              >
                 PRODUCTOS DESTACADOS
               </Badge>
-              <h1 className="text-4xl font-bold leading-tight sm:text-5xl lg:text-6xl">
-                Bienvenidos a<br />
-                <span className="text-red-500">Andrea Tienda Online</span>
+              <h1 className="text-4xl font-bold leading-tight text-slate-900 sm:text-5xl lg:text-6xl">
+                Bienvenidos a
+                <br />
+                <span style={{ color: BRAND_RED }}>{storeName}</span>
               </h1>
-              <p className="max-w-xl text-lg text-slate-300">
-                Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago o WhatsApp.
+              <p className="max-w-xl text-lg text-slate-600">
+                Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago
+                o WhatsApp.
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
                   href="/storefront/products"
-                  className="inline-flex items-center rounded-md bg-red-600 px-8 py-3 text-lg font-medium text-white hover:bg-red-700"
+                  className="inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
+                  style={{ backgroundColor: BRAND_RED }}
                 >
                   Ver productos
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -164,16 +472,13 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                   href="https://wa.me/5493743417659"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md border border-white bg-transparent px-8 py-3 text-lg font-medium text-white hover:bg-white hover:text-slate-900"
+                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-8 py-3 text-lg font-medium text-slate-900 transition hover:bg-slate-50"
                 >
                   Contactar por WhatsApp
                 </a>
               </div>
             </div>
-            <div className="relative hidden lg:block">
-              <div className="aspect-square rounded-3xl bg-gradient-to-br from-blue-600/30 to-purple-600/30 backdrop-blur-sm" />
-              <div className="absolute inset-4 rounded-2xl bg-gradient-to-br from-red-500/20 to-orange-500/20" />
-            </div>
+            <HeroVisual storeName={storeName} heroImageUrl={heroImageUrl} />
           </div>
         </div>
       </section>
@@ -182,7 +487,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       <section className="bg-white py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-red-600">
+            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
               COMPRAR POR CATEGORÍA
             </p>
             <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -215,7 +520,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       <section className="bg-slate-50 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-red-600">
+            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
               LO MÁS VENDIDO
             </p>
             <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -289,7 +594,8 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
           <div className="mt-12 text-center">
             <Link
               href="/storefront/products"
-              className="inline-flex items-center rounded-md bg-red-600 px-8 py-3 text-lg font-medium text-white hover:bg-red-700"
+              className="inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
+              style={{ backgroundColor: BRAND_RED }}
             >
               Ver todos los productos
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -298,11 +604,130 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
         </div>
       </section>
 
+      {/* OFERTAS ESPECIALES */}
+      {promoSectionProducts.length > 0 ? (
+        <section className="bg-white py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+                PROMOCIONES
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
+                Ofertas Especiales
+              </h2>
+            </div>
+
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {promoSectionProducts.map((product) => {
+                const imageUrl = product.images[0] ?? ''
+                const hasDiscount =
+                  product.compareAtPrice !== null && product.compareAtPrice > product.price
+
+                return (
+                  <Card
+                    key={product.id}
+                    className="group overflow-hidden rounded-2xl border border-slate-100 shadow-md transition-shadow hover:shadow-xl"
+                  >
+                    <CardContent className="p-0">
+                      <Link href={`/storefront/product/${product.id}`} className="block">
+                        <div className="relative aspect-square overflow-hidden bg-slate-100">
+                          {imageUrl ? (
+                            <img
+                              src={imageUrl}
+                              alt={product.name}
+                              className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center text-4xl font-semibold text-slate-400">
+                              {product.name.charAt(0).toUpperCase()}
+                            </div>
+                          )}
+                          <Badge
+                            className="absolute left-3 top-3 text-white"
+                            style={{ backgroundColor: BRAND_RED }}
+                          >
+                            {hasDiscount ? 'OFERTA' : 'PROMO'}
+                          </Badge>
+                        </div>
+                        <div className="p-5">
+                          <h3 className="mb-3 line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-red-600">
+                            {product.name}
+                          </h3>
+                          <div className="flex items-center gap-3">
+                            {hasDiscount ? (
+                              <>
+                                <span className="text-sm text-slate-400 line-through">
+                                  {formatPrice(product.compareAtPrice ?? product.price)}
+                                </span>
+                                <span className="text-xl font-bold" style={{ color: BRAND_RED }}>
+                                  {formatPrice(product.price)}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-xl font-bold" style={{ color: BRAND_RED }}>
+                                {formatPrice(product.price)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </Link>
+                      <div className="px-5 pb-5">
+                        <AddToCartButton
+                          productId={product.id}
+                          productName={product.name}
+                          productPrice={product.price}
+                          productImage={imageUrl}
+                          className="w-full"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                )
+              })}
+            </div>
+          </div>
+        </section>
+      ) : null}
+
+      {/* TESTIMONIOS */}
+      <section className="bg-slate-50 py-16 sm:py-20">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center">
+            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+              OPINIONES
+            </p>
+            <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
+              Lo que dicen nuestros clientes
+            </h2>
+          </div>
+
+          <div className="mt-12 grid gap-6 md:grid-cols-3">
+            {testimonials.map((testimonial) => (
+              <Card
+                key={testimonial.name}
+                className="rounded-2xl border border-slate-100 bg-white shadow-md"
+              >
+                <CardContent className="space-y-4 p-6">
+                  <StarRating />
+                  <p className="text-sm leading-relaxed text-slate-600">
+                    &ldquo;{testimonial.comment}&rdquo;
+                  </p>
+                  <div>
+                    <p className="font-semibold text-slate-900">{testimonial.name}</p>
+                    <p className="text-sm text-slate-500">{testimonial.city}</p>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* NEWSLETTER */}
       <section className="bg-slate-900 py-16 text-white sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest text-red-500">
+            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
               NEWSLETTER
             </p>
             <h2 className="mt-2 text-3xl font-bold sm:text-4xl">
@@ -317,7 +742,10 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                 placeholder="Ingresá tu email"
                 className="flex-1 rounded-full bg-white/10 px-6 py-3 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500"
               />
-              <Button className="rounded-full bg-red-600 px-8 py-3 hover:bg-red-700">
+              <Button
+                className="rounded-full px-8 py-3 text-white hover:opacity-90"
+                style={{ backgroundColor: BRAND_RED }}
+              >
                 Suscribirme
               </Button>
             </div>

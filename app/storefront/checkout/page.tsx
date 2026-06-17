@@ -54,11 +54,25 @@ const provincias = [
   'Tucumán',
 ]
 
-const shippingMethods = [
-  { id: 'standard', label: 'Estándar (3-5 días)', price: 5000 },
-  { id: 'express', label: 'Express (24-48hs)', price: 8500 },
-  { id: 'free', label: 'Gratis (compra mayor a $50.000)', price: 0 },
-]
+type ShippingConfig = {
+  freeShippingThreshold: number
+  shippingStandardCost: number
+  shippingExpressCost: number
+  freeShippingEnabled: boolean
+}
+
+const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
+  freeShippingThreshold: 50000,
+  shippingStandardCost: 5000,
+  shippingExpressCost: 8500,
+  freeShippingEnabled: true,
+}
+
+type ShippingMethodOption = {
+  id: 'standard' | 'express' | 'free'
+  label: string
+  price: number
+}
 
 const paymentMethods = [
   { id: 'mercadopago', label: 'Mercado Pago', icon: '💳' },
@@ -93,17 +107,107 @@ function buildCustomerAddress(formData: CheckoutFormData): string {
   return parts.join(' · ')
 }
 
-function calculateShippingCost(orderSubtotal: number): number {
-  return orderSubtotal > 50000 ? 0 : 5000
+function normalizeProductName(name: string): string {
+  return name
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toUpperCase()
 }
 
-function resolveShippingMethod(orderSubtotal: number): 'free' | 'standard' {
-  return orderSubtotal > 50000 ? 'free' : 'standard'
+function hasFreeShippingByName(productName: string): boolean {
+  return normalizeProductName(productName).includes('ENVIO GRATIS')
 }
 
-async function getAuthenticatedStoreId(
+function cartHasFreeShippingByName(cartItems: { name: string }[]): boolean {
+  return cartItems.some((item) => hasFreeShippingByName(item.name))
+}
+
+function qualifiesForThresholdFreeShipping(
+  orderSubtotal: number,
+  config: ShippingConfig,
+): boolean {
+  return config.freeShippingEnabled && orderSubtotal >= config.freeShippingThreshold
+}
+
+function calculateShippingCost(
+  orderSubtotal: number,
+  hasProductFreeShipping: boolean,
+  selectedMethod: string,
+  config: ShippingConfig,
+): number {
+  if (hasProductFreeShipping || qualifiesForThresholdFreeShipping(orderSubtotal, config)) {
+    return 0
+  }
+
+  if (selectedMethod === 'express') {
+    return config.shippingExpressCost
+  }
+
+  return config.shippingStandardCost
+}
+
+function resolveShippingMethod(
+  orderSubtotal: number,
+  hasProductFreeShipping: boolean,
+  selectedMethod: string,
+  config: ShippingConfig,
+): 'free' | 'standard' | 'express' {
+  if (hasProductFreeShipping || qualifiesForThresholdFreeShipping(orderSubtotal, config)) {
+    return 'free'
+  }
+
+  if (selectedMethod === 'express') {
+    return 'express'
+  }
+
+  return 'standard'
+}
+
+function buildShippingMethodOptions(config: ShippingConfig): ShippingMethodOption[] {
+  const methods: ShippingMethodOption[] = [
+    {
+      id: 'standard',
+      label: 'Estándar (3-5 días)',
+      price: config.shippingStandardCost,
+    },
+    {
+      id: 'express',
+      label: 'Express (24-48hs)',
+      price: config.shippingExpressCost,
+    },
+  ]
+
+  if (config.freeShippingEnabled) {
+    methods.push({
+      id: 'free',
+      label: `Gratis (compra mayor a $${config.freeShippingThreshold.toLocaleString('es-AR')})`,
+      price: 0,
+    })
+  }
+
+  return methods
+}
+
+function resolveFreeShippingFromProducts(
+  cartItems: { name: string }[],
+  dbProductNames: string[],
+): boolean {
+  if (cartHasFreeShippingByName(cartItems)) {
+    return true
+  }
+
+  return dbProductNames.some((name) => hasFreeShippingByName(name))
+}
+
+type AuthenticatedStore = {
+  id: string
+  name: string
+  shippingConfig: ShippingConfig
+}
+
+async function getAuthenticatedStore(
   supabase: ReturnType<typeof createClient>,
-): Promise<string | null> {
+): Promise<AuthenticatedStore | null> {
   const {
     data: { user },
     error: authError,
@@ -115,7 +219,9 @@ async function getAuthenticatedStoreId(
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
-    .select('id')
+    .select(
+      'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled',
+    )
     .eq('owner_id', user.id)
     .maybeSingle()
 
@@ -123,7 +229,23 @@ async function getAuthenticatedStoreId(
     return null
   }
 
-  return store.id
+  return {
+    id: store.id,
+    name: store.name,
+    shippingConfig: {
+      freeShippingThreshold: Number(
+        store.free_shipping_threshold ?? DEFAULT_SHIPPING_CONFIG.freeShippingThreshold,
+      ),
+      shippingStandardCost: Number(
+        store.shipping_standard_cost ?? DEFAULT_SHIPPING_CONFIG.shippingStandardCost,
+      ),
+      shippingExpressCost: Number(
+        store.shipping_express_cost ?? DEFAULT_SHIPPING_CONFIG.shippingExpressCost,
+      ),
+      freeShippingEnabled:
+        store.free_shipping_enabled ?? DEFAULT_SHIPPING_CONFIG.freeShippingEnabled,
+    },
+  }
 }
 
 export default function CheckoutPage() {
@@ -134,8 +256,13 @@ export default function CheckoutPage() {
   const [authLoading, setAuthLoading] = useState(true)
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [storeId, setStoreId] = useState<string | null>(null)
+  const [storeName, setStoreName] = useState<string | null>(null)
+  const [shippingConfig, setShippingConfig] = useState<ShippingConfig>(DEFAULT_SHIPPING_CONFIG)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
+  const [paymentError, setPaymentError] = useState('')
+  const [pendingOrderId, setPendingOrderId] = useState<string | null>(null)
+  const [hasProductFreeShipping, setHasProductFreeShipping] = useState(false)
 
   const [formData, setFormData] = useState<CheckoutFormData>({
     email: '',
@@ -159,16 +286,96 @@ export default function CheckoutPage() {
   useEffect(() => {
     async function loadAuthenticatedStore() {
       setAuthLoading(true)
-      const resolvedStoreId = await getAuthenticatedStoreId(supabase)
-      setStoreId(resolvedStoreId)
-      setIsAuthenticated(Boolean(resolvedStoreId))
+      const store = await getAuthenticatedStore(supabase)
+      setStoreId(store?.id ?? null)
+      setStoreName(store?.name ?? null)
+      if (store) {
+        setShippingConfig(store.shippingConfig)
+      }
+      setIsAuthenticated(Boolean(store))
       setAuthLoading(false)
     }
 
     void loadAuthenticatedStore()
   }, [supabase])
 
-  const shippingCost = calculateShippingCost(subtotal)
+  useEffect(() => {
+    async function loadProductFreeShipping() {
+      const fromCart = cartHasFreeShippingByName(items)
+      setHasProductFreeShipping(fromCart)
+
+      if (fromCart || !storeId || items.length === 0) {
+        return
+      }
+
+      const { data: products, error: productsError } = await supabase
+        .from('products')
+        .select('id, name')
+        .in(
+          'id',
+          items.map((item) => item.id),
+        )
+        .eq('store_id', storeId)
+
+      if (productsError || !products) {
+        return
+      }
+
+      setHasProductFreeShipping(
+        resolveFreeShippingFromProducts(
+          items,
+          products.map((product: { name: string }) => product.name),
+        ),
+      )
+    }
+
+    void loadProductFreeShipping()
+  }, [items, storeId, supabase])
+
+  useEffect(() => {
+    const qualifiesForFree =
+      hasProductFreeShipping ||
+      (shippingConfig.freeShippingEnabled && subtotal >= shippingConfig.freeShippingThreshold)
+
+    if (qualifiesForFree) {
+      setShippingMethod('free')
+    } else if (shippingMethod === 'free') {
+      setShippingMethod('standard')
+    }
+  }, [
+    hasProductFreeShipping,
+    subtotal,
+    shippingConfig.freeShippingEnabled,
+    shippingConfig.freeShippingThreshold,
+    shippingMethod,
+  ])
+
+  const shippingMethods = useMemo(
+    () => buildShippingMethodOptions(shippingConfig),
+    [shippingConfig],
+  )
+
+  const qualifiesForFreeShipping =
+    hasProductFreeShipping || qualifiesForThresholdFreeShipping(subtotal, shippingConfig)
+
+  const shippingCost = calculateShippingCost(
+    subtotal,
+    hasProductFreeShipping,
+    shippingMethod,
+    shippingConfig,
+  )
+
+  const freeShippingRemaining = Math.max(0, shippingConfig.freeShippingThreshold - subtotal)
+
+  const freeShippingProgressPercent = shippingConfig.freeShippingThreshold
+    ? Math.min(100, (subtotal / shippingConfig.freeShippingThreshold) * 100)
+    : 0
+
+  const showFreeShippingProgress =
+    shippingConfig.freeShippingEnabled &&
+    !hasProductFreeShipping &&
+    subtotal < shippingConfig.freeShippingThreshold
+
   const total = subtotal + shippingCost
 
   if (authLoading) {
@@ -264,6 +471,128 @@ export default function CheckoutPage() {
     return Object.keys(newErrors).length === 0
   }
 
+  const createOrder = async (): Promise<{ orderId: string } | { error: string }> => {
+    const productIds = items.map((item) => item.id)
+
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('id', productIds)
+      .eq('store_id', storeId)
+      .eq('active', true)
+
+    if (productsError || !products || products.length !== productIds.length) {
+      return { error: 'Algunos productos del carrito ya no están disponibles.' }
+    }
+
+    const orderHasFreeShipping = resolveFreeShippingFromProducts(
+      items,
+      products.map((product: { name: string }) => product.name),
+    )
+
+    const orderSubtotal = items.reduce(
+      (sum, item) => sum + item.price * item.quantity,
+      0,
+    )
+    const orderShippingCost = calculateShippingCost(
+      orderSubtotal,
+      orderHasFreeShipping,
+      shippingMethod,
+      shippingConfig,
+    )
+    const orderTotal = orderSubtotal + orderShippingCost
+    const orderShippingMethod = resolveShippingMethod(
+      orderSubtotal,
+      orderHasFreeShipping,
+      shippingMethod,
+      shippingConfig,
+    )
+
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert({
+        store_id: storeId,
+        customer_name: formData.nombre.trim(),
+        customer_email: formData.email.trim(),
+        customer_phone: formData.phone.trim(),
+        customer_address: buildCustomerAddress(formData),
+        status: 'pending',
+        payment_status: 'pending',
+        payment_method: paymentMethod as 'mercadopago' | 'transfer' | 'effectivo',
+        shipping_method: orderShippingMethod,
+        shipping_cost: orderShippingCost,
+        subtotal: orderSubtotal,
+        total: orderTotal,
+        discount_amount: 0,
+      })
+      .select('id')
+      .single()
+
+    if (orderError || !order) {
+      return { error: orderError?.message ?? 'No se pudo crear el pedido.' }
+    }
+
+    const orderItems = items.map((item) => ({
+      order_id: order.id,
+      product_id: item.id,
+      quantity: item.quantity,
+      unit_price: item.price,
+      total: item.price * item.quantity,
+    }))
+
+    const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
+
+    if (itemsError) {
+      return { error: itemsError.message }
+    }
+
+    return { orderId: order.id }
+  }
+
+  const startMercadoPagoPayment = async (
+    orderId: string,
+  ): Promise<{ ok: true } | { error: string }> => {
+    const response = await fetch('/api/mercadopago/create-preference', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ orderId }),
+    })
+
+    const payload = (await response.json()) as { initPoint?: string; error?: string }
+
+    if (!response.ok || !payload.initPoint) {
+      return { error: payload.error ?? 'No se pudo iniciar el pago con Mercado Pago.' }
+    }
+
+    clearCart()
+    window.location.href = payload.initPoint
+    return { ok: true }
+  }
+
+  const handleRetryPayment = async () => {
+    if (!pendingOrderId) {
+      return
+    }
+
+    setSubmitting(true)
+    setPaymentError('')
+    setSubmitError('')
+
+    try {
+      const paymentResult = await startMercadoPagoPayment(pendingOrderId)
+
+      if ('error' in paymentResult) {
+        setPaymentError(paymentResult.error)
+      }
+    } catch (err) {
+      setPaymentError(err instanceof Error ? err.message : 'Ocurrió un error inesperado.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
 
@@ -273,78 +602,37 @@ export default function CheckoutPage() {
 
     setSubmitting(true)
     setSubmitError('')
+    setPaymentError('')
 
     try {
-      const productIds = items.map((item) => item.id)
+      const orderResult = await createOrder()
 
-      const { data: products, error: productsError } = await supabase
-        .from('products')
-        .select('id')
-        .in('id', productIds)
-        .eq('store_id', storeId)
-        .eq('active', true)
-
-      if (productsError || !products || products.length !== productIds.length) {
-        setSubmitError('Algunos productos del carrito ya no están disponibles.')
+      if ('error' in orderResult) {
+        setSubmitError(orderResult.error)
         return
       }
 
-      const orderSubtotal = items.reduce(
-        (sum, item) => sum + item.price * item.quantity,
-        0,
-      )
-      const orderShippingCost = calculateShippingCost(orderSubtotal)
-      const orderTotal = orderSubtotal + orderShippingCost
-      const orderShippingMethod = resolveShippingMethod(orderSubtotal)
+      if (paymentMethod === 'mercadopago') {
+        setPendingOrderId(orderResult.orderId)
+        const paymentResult = await startMercadoPagoPayment(orderResult.orderId)
 
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          store_id: storeId,
-          customer_name: formData.nombre.trim(),
-          customer_email: formData.email.trim(),
-          customer_phone: formData.phone.trim(),
-          customer_address: buildCustomerAddress(formData),
-          status: 'pending',
-          payment_status: 'pending',
-          payment_method: paymentMethod as 'mercadopago' | 'transfer' | 'effectivo',
-          shipping_method: orderShippingMethod,
-          shipping_cost: orderShippingCost,
-          subtotal: orderSubtotal,
-          total: orderTotal,
-          discount_amount: 0,
-        })
-        .select('id')
-        .single()
+        if ('error' in paymentResult) {
+          setPaymentError(paymentResult.error)
+        }
 
-      if (orderError || !order) {
-        setSubmitError(orderError?.message ?? 'No se pudo crear el pedido.')
-        return
-      }
-
-      const orderItems = items.map((item) => ({
-        order_id: order.id,
-        product_id: item.id,
-        quantity: item.quantity,
-        unit_price: item.price,
-        total: item.price * item.quantity,
-      }))
-
-      const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
-
-      if (itemsError) {
-        setSubmitError(itemsError.message)
         return
       }
 
       clearCart()
-      router.push(`/storefront/checkout/confirmation?orderId=${order.id}`)
+      router.push(`/storefront/checkout/confirmation?orderId=${orderResult.orderId}`)
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : 'Ocurrió un error inesperado.')
     } finally {
       setSubmitting(false)
     }
   }
+
+  const checkoutTitle = `${storeName?.trim() || 'Tu Tienda'} - Checkout`
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -361,7 +649,7 @@ export default function CheckoutPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 font-semibold text-red-600">
               F
             </div>
-            <h1 className="text-2xl font-semibold text-slate-950">Fashion Store - Checkout</h1>
+            <h1 className="text-2xl font-semibold text-slate-950">{checkoutTitle}</h1>
           </div>
         </div>
       </div>
@@ -370,6 +658,22 @@ export default function CheckoutPage() {
         {submitError && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {submitError}
+          </div>
+        )}
+
+        {paymentError && (
+          <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+            <p>{paymentError}</p>
+            {pendingOrderId ? (
+              <Button
+                type="button"
+                onClick={handleRetryPayment}
+                disabled={submitting}
+                className="mt-4 bg-red-600 text-white hover:bg-red-700"
+              >
+                {submitting ? 'Reintentando...' : 'Reintentar pago'}
+              </Button>
+            ) : null}
           </div>
         )}
 
@@ -578,10 +882,14 @@ export default function CheckoutPage() {
                       className="h-4 w-4 accent-red-600"
                     />
                     <div className="flex-1">
-                      <p className="text-sm font-semibold text-slate-900">{method.label}</p>
+                      <p className="text-sm font-semibold text-slate-900">
+                        {method.id === 'free' && hasProductFreeShipping
+                          ? 'Gratis (producto con envío incluido)'
+                          : method.label}
+                      </p>
                     </div>
                     <span className="text-sm font-semibold text-slate-900">
-                      {subtotal > 50000 && method.id === 'free'
+                      {qualifiesForFreeShipping
                         ? 'Gratis'
                         : method.id === 'free'
                           ? '—'
@@ -694,6 +1002,24 @@ export default function CheckoutPage() {
                     <span>Subtotal</span>
                     <span>${subtotal.toLocaleString('es-AR')}</span>
                   </div>
+                  {showFreeShippingProgress ? (
+                    <div className="space-y-2 rounded-lg bg-slate-50 p-3">
+                      <p className="text-sm font-medium text-slate-800">
+                        ¡Te faltan ${freeShippingRemaining.toLocaleString('es-AR')} para envío gratis!
+                      </p>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                        <div
+                          className="h-full rounded-full bg-red-600 transition-all duration-300"
+                          style={{ width: `${freeShippingProgressPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+                  {qualifiesForFreeShipping && !hasProductFreeShipping ? (
+                    <p className="text-sm font-medium text-emerald-600">
+                      ¡Alcanzaste el envío gratis por monto de compra!
+                    </p>
+                  ) : null}
                   <div className="flex justify-between text-slate-600">
                     <span>Envío</span>
                     <span>
