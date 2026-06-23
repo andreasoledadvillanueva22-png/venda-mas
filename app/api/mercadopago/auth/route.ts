@@ -27,15 +27,20 @@ function getSettingsRedirectUrl(request: Request, params: Record<string, string>
   return redirectUrl
 }
 
-function getRedirectUri(request: Request): string {
+const MP_OAUTH_DEFAULT_REDIRECT_URI = 'http://localhost:3000/api/mercadopago/auth'
+
+function normalizeRedirectUri(uri: string): string {
+  return uri.trim().replace(/\/$/, '')
+}
+
+function getRedirectUri(): string {
   const configuredRedirectUri = process.env.NEXT_MP_REDIRECT_URI?.trim()
 
   if (configuredRedirectUri) {
-    return configuredRedirectUri
+    return normalizeRedirectUri(configuredRedirectUri)
   }
 
-  const callbackUrl = new URL('/api/mercadopago/auth', request.url)
-  return callbackUrl.toString()
+  return MP_OAUTH_DEFAULT_REDIRECT_URI
 }
 
 async function exchangeCodeForToken(
@@ -86,6 +91,15 @@ export async function GET(request: Request) {
   const code = searchParams.get('code')
   const oauthError = searchParams.get('error')
   const oauthErrorDescription = searchParams.get('error_description')
+  const redirectUri = getRedirectUri()
+
+  console.log('[MP OAuth callback]', {
+    hasCode: Boolean(code?.trim()),
+    oauthError,
+    oauthErrorDescription,
+    redirectUri,
+    requestUrl: request.url,
+  })
 
   if (oauthError) {
     const message = oauthErrorDescription ?? oauthError
@@ -132,7 +146,6 @@ export async function GET(request: Request) {
   }
 
   try {
-    const redirectUri = getRedirectUri(request)
     const tokenData = await exchangeCodeForToken(code.trim(), redirectUri)
 
     const { error: updateError } = await supabase
