@@ -34,3 +34,4 @@ Thumbs.db
 # Supabase (si hay archivos locales)
 supabase/.temp/
 supabase/.branches/
+tsconfig.tsbuildinfo
