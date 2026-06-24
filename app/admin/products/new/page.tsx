@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ArrowLeft, ImagePlus, Loader2, Trash2 } from 'lucide-react'
@@ -142,6 +142,20 @@ function parseTagsInput(value: string): string[] {
 }
 
 export default function NewProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+        </div>
+      }
+    >
+      <NewProductPageContent />
+    </Suspense>
+  )
+}
+
+function NewProductPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = useMemo(() => createClient(), [])

@@ -1,12 +1,27 @@
 'use client'
 
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Check } from 'lucide-react'
+import { Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
 export default function CheckoutConfirmationPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center bg-slate-50">
+          <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+        </div>
+      }
+    >
+      <CheckoutConfirmationPageContent />
+    </Suspense>
+  )
+}
+
+function CheckoutConfirmationPageContent() {
   const searchParams = useSearchParams()
   const orderId = searchParams.get('orderId')
 

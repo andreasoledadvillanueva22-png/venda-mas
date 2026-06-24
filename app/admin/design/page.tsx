@@ -376,7 +376,14 @@ export default function AdminDesignPage() {
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
                       <Label>Fuente para títulos</Label>
-                      <Select value={fontTitle} onValueChange={setFontTitle}>
+                      <Select
+                        value={fontTitle}
+                        onValueChange={(value) => {
+                          if (value) {
+                            setFontTitle(value)
+                          }
+                        }}
+                      >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Seleccionar" />
                         </SelectTrigger>
@@ -389,7 +396,14 @@ export default function AdminDesignPage() {
                     </div>
                     <div className="space-y-2">
                       <Label>Fuente para cuerpo</Label>
-                      <Select value={fontBody} onValueChange={setFontBody}>
+                      <Select
+                        value={fontBody}
+                        onValueChange={(value) => {
+                          if (value) {
+                            setFontBody(value)
+                          }
+                        }}
+                      >
                         <SelectTrigger className="w-full">
                           <SelectValue placeholder="Seleccionar" />
                         </SelectTrigger>

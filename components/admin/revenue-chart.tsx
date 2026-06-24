@@ -92,7 +92,10 @@ export function RevenueChart({ className }: RevenueChartProps) {
                   borderRadius: '8px',
                   boxShadow: '0 4px 12px -1px rgb(0 0 0 / 0.1)',
                 }}
-                formatter={(value: number) => [formatCurrency(value), 'Revenue']}
+                formatter={(value) => [
+                  formatCurrency(typeof value === 'number' ? value : Number(value ?? 0)),
+                  'Revenue',
+                ]}
                 labelStyle={{ color: 'oklch(0.13 0.02 250)', fontWeight: 600 }}
               />
               <Line

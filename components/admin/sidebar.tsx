@@ -39,11 +39,13 @@ const navigation = [
 interface AdminSidebarProps {
   userEmail?: string
   userAvatar?: string
+  onClose?: () => void
 }
 
 export function AdminSidebar({
   userEmail = 'admin@VendaMás.com',
   userAvatar,
+  onClose,
 }: AdminSidebarProps) {
   const pathname = usePathname()
 
@@ -54,7 +56,17 @@ export function AdminSidebar({
         <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
           <span className="text-lg font-bold text-primary-foreground">AV</span>
         </div>
-        <span className="text-lg font-bold tracking-tight text-sidebar-foreground">VendaMás</span>
+        <span className="flex-1 text-lg font-bold tracking-tight text-sidebar-foreground">VendaMás</span>
+        {onClose ? (
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground lg:hidden"
+          >
+            <X className="h-5 w-5" />
+            <span className="sr-only">Cerrar menú</span>
+          </button>
+        ) : null}
       </div>
 
       {/* Main Navigation */}
