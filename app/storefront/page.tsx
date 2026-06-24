@@ -434,13 +434,6 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
 
       {/* HERO */}
       <section className="overflow-hidden bg-gray-50">
-        <div
-          className="py-3 text-center text-sm font-semibold tracking-wide text-white sm:text-base"
-          style={{ backgroundColor: BRAND_RED }}
-        >
-          ENVÍO GRATIS en compras superiores a $45.000
-        </div>
-
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div className="space-y-6">
