@@ -9,6 +9,7 @@ import {
   CreditCard,
   ArrowLeft,
   Loader2,
+  Store,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -68,8 +69,22 @@ const DEFAULT_SHIPPING_CONFIG: ShippingConfig = {
   freeShippingEnabled: true,
 }
 
+type LocalPickupConfig = {
+  enabled: boolean
+  address: string | null
+  instructions: string | null
+  schedule: string | null
+}
+
+const DEFAULT_LOCAL_PICKUP_CONFIG: LocalPickupConfig = {
+  enabled: false,
+  address: null,
+  instructions: null,
+  schedule: null,
+}
+
 type ShippingMethodOption = {
-  id: 'standard' | 'express' | 'free'
+  id: 'standard' | 'express' | 'free' | 'local_pickup'
   label: string
   price: number
 }
@@ -107,6 +122,24 @@ function buildCustomerAddress(formData: CheckoutFormData): string {
   return parts.join(' · ')
 }
 
+function buildPickupCustomerAddress(config: LocalPickupConfig): string | null {
+  if (!config.address?.trim()) {
+    return null
+  }
+
+  const parts = [config.address.trim()]
+
+  if (config.schedule?.trim()) {
+    parts.push(`Horarios: ${config.schedule.trim()}`)
+  }
+
+  if (config.instructions?.trim()) {
+    parts.push(`Instrucciones: ${config.instructions.trim()}`)
+  }
+
+  return parts.join(' · ')
+}
+
 function normalizeProductName(name: string): string {
   return name
     .normalize('NFD')
@@ -135,6 +168,10 @@ function calculateShippingCost(
   selectedMethod: string,
   config: ShippingConfig,
 ): number {
+  if (selectedMethod === 'local_pickup') {
+    return 0
+  }
+
   if (hasProductFreeShipping || qualifiesForThresholdFreeShipping(orderSubtotal, config)) {
     return 0
   }
@@ -151,7 +188,11 @@ function resolveShippingMethod(
   hasProductFreeShipping: boolean,
   selectedMethod: string,
   config: ShippingConfig,
-): 'free' | 'standard' | 'express' {
+): 'free' | 'standard' | 'express' | 'local_pickup' {
+  if (selectedMethod === 'local_pickup') {
+    return 'local_pickup'
+  }
+
   if (hasProductFreeShipping || qualifiesForThresholdFreeShipping(orderSubtotal, config)) {
     return 'free'
   }
@@ -163,8 +204,21 @@ function resolveShippingMethod(
   return 'standard'
 }
 
-function buildShippingMethodOptions(config: ShippingConfig): ShippingMethodOption[] {
-  const methods: ShippingMethodOption[] = [
+function buildShippingMethodOptions(
+  config: ShippingConfig,
+  localPickup: LocalPickupConfig,
+): ShippingMethodOption[] {
+  const methods: ShippingMethodOption[] = []
+
+  if (localPickup.enabled) {
+    methods.push({
+      id: 'local_pickup',
+      label: 'Retiro en local',
+      price: 0,
+    })
+  }
+
+  methods.push(
     {
       id: 'standard',
       label: 'Estándar (3-5 días)',
@@ -175,7 +229,7 @@ function buildShippingMethodOptions(config: ShippingConfig): ShippingMethodOptio
       label: 'Express (24-48hs)',
       price: config.shippingExpressCost,
     },
-  ]
+  )
 
   if (config.freeShippingEnabled) {
     methods.push({
@@ -203,6 +257,7 @@ type AuthenticatedStore = {
   id: string
   name: string
   shippingConfig: ShippingConfig
+  localPickupConfig: LocalPickupConfig
 }
 
 async function getAuthenticatedStore(
@@ -220,7 +275,7 @@ async function getAuthenticatedStore(
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled',
+      'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -245,6 +300,12 @@ async function getAuthenticatedStore(
       freeShippingEnabled:
         store.free_shipping_enabled ?? DEFAULT_SHIPPING_CONFIG.freeShippingEnabled,
     },
+    localPickupConfig: {
+      enabled: store.enable_local_pickup ?? DEFAULT_LOCAL_PICKUP_CONFIG.enabled,
+      address: store.pickup_address ?? null,
+      instructions: store.pickup_instructions ?? null,
+      schedule: store.pickup_schedule ?? null,
+    },
   }
 }
 
@@ -258,6 +319,9 @@ export default function CheckoutPage() {
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeName, setStoreName] = useState<string | null>(null)
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig>(DEFAULT_SHIPPING_CONFIG)
+  const [localPickupConfig, setLocalPickupConfig] = useState<LocalPickupConfig>(
+    DEFAULT_LOCAL_PICKUP_CONFIG,
+  )
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [paymentError, setPaymentError] = useState('')
@@ -291,6 +355,7 @@ export default function CheckoutPage() {
       setStoreName(store?.name ?? null)
       if (store) {
         setShippingConfig(store.shippingConfig)
+        setLocalPickupConfig(store.localPickupConfig)
       }
       setIsAuthenticated(Boolean(store))
       setAuthLoading(false)
@@ -333,6 +398,10 @@ export default function CheckoutPage() {
   }, [items, storeId, supabase])
 
   useEffect(() => {
+    if (shippingMethod === 'local_pickup') {
+      return
+    }
+
     const qualifiesForFree =
       hasProductFreeShipping ||
       (shippingConfig.freeShippingEnabled && subtotal >= shippingConfig.freeShippingThreshold)
@@ -350,9 +419,17 @@ export default function CheckoutPage() {
     shippingMethod,
   ])
 
+  useEffect(() => {
+    if (!localPickupConfig.enabled && shippingMethod === 'local_pickup') {
+      setShippingMethod('standard')
+    }
+  }, [localPickupConfig.enabled, shippingMethod])
+
+  const isLocalPickup = shippingMethod === 'local_pickup'
+
   const shippingMethods = useMemo(
-    () => buildShippingMethodOptions(shippingConfig),
-    [shippingConfig],
+    () => buildShippingMethodOptions(shippingConfig, localPickupConfig),
+    [shippingConfig, localPickupConfig],
   )
 
   const qualifiesForFreeShipping =
@@ -372,6 +449,7 @@ export default function CheckoutPage() {
     : 0
 
   const showFreeShippingProgress =
+    !isLocalPickup &&
     shippingConfig.freeShippingEnabled &&
     !hasProductFreeShipping &&
     subtotal < shippingConfig.freeShippingThreshold
@@ -451,17 +529,19 @@ export default function CheckoutPage() {
     if (!formData.nombre.trim()) {
       newErrors.nombre = 'Nombre requerido'
     }
-    if (!formData.calle.trim()) {
-      newErrors.calle = 'Dirección requerida'
-    }
-    if (!formData.ciudad.trim()) {
-      newErrors.ciudad = 'Ciudad requerida'
-    }
-    if (!formData.provincia) {
-      newErrors.provincia = 'Provincia requerida'
-    }
-    if (!formData.codigoPostal.trim()) {
-      newErrors.codigoPostal = 'Código postal requerido'
+    if (!isLocalPickup) {
+      if (!formData.calle.trim()) {
+        newErrors.calle = 'Dirección requerida'
+      }
+      if (!formData.ciudad.trim()) {
+        newErrors.ciudad = 'Ciudad requerida'
+      }
+      if (!formData.provincia) {
+        newErrors.provincia = 'Provincia requerida'
+      }
+      if (!formData.codigoPostal.trim()) {
+        newErrors.codigoPostal = 'Código postal requerido'
+      }
     }
     if (!acceptTerms) {
       newErrors.terms = 'Debes aceptar los términos y condiciones'
@@ -507,6 +587,9 @@ export default function CheckoutPage() {
       shippingMethod,
       shippingConfig,
     )
+    const customerAddress = isLocalPickup
+      ? buildPickupCustomerAddress(localPickupConfig)
+      : buildCustomerAddress(formData)
 
     const { data: order, error: orderError } = await supabase
       .from('orders')
@@ -515,7 +598,7 @@ export default function CheckoutPage() {
         customer_name: formData.nombre.trim(),
         customer_email: formData.email.trim(),
         customer_phone: formData.phone.trim(),
-        customer_address: buildCustomerAddress(formData),
+        customer_address: customerAddress,
         status: 'pending',
         payment_status: 'pending',
         payment_method: paymentMethod as 'mercadopago' | 'transfer' | 'effectivo',
@@ -713,6 +796,20 @@ export default function CheckoutPage() {
                   />
                   {errors.phone && <p className="mt-1 text-xs text-red-600">{errors.phone}</p>}
                 </div>
+                {isLocalPickup ? (
+                  <div>
+                    <Label htmlFor="nombre">Nombre completo *</Label>
+                    <Input
+                      id="nombre"
+                      placeholder="Juan Pérez"
+                      value={formData.nombre}
+                      onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
+                      className="mt-1"
+                      disabled={submitting}
+                    />
+                    {errors.nombre && <p className="mt-1 text-xs text-red-600">{errors.nombre}</p>}
+                  </div>
+                ) : null}
                 <label className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -730,134 +827,165 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[2rem]">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <MapPin className="h-5 w-5 text-red-600" />
-                  Dirección de envío
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label htmlFor="nombre">Nombre completo *</Label>
-                  <Input
-                    id="nombre"
-                    placeholder="Juan Pérez"
-                    value={formData.nombre}
-                    onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
-                    className="mt-1"
-                    disabled={submitting}
-                  />
-                  {errors.nombre && <p className="mt-1 text-xs text-red-600">{errors.nombre}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="dni">DNI (opcional)</Label>
-                  <Input
-                    id="dni"
-                    placeholder="12.345.678"
-                    value={formData.dni}
-                    onChange={(event) => setFormData({ ...formData, dni: event.target.value })}
-                    className="mt-1"
-                    disabled={submitting}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="calle">Calle y número *</Label>
-                  <Input
-                    id="calle"
-                    placeholder="Av. Libertador 1234"
-                    value={formData.calle}
-                    onChange={(event) => setFormData({ ...formData, calle: event.target.value })}
-                    className="mt-1"
-                    disabled={submitting}
-                  />
-                  {errors.calle && <p className="mt-1 text-xs text-red-600">{errors.calle}</p>}
-                </div>
-                <div>
-                  <Label htmlFor="piso">Piso/Departamento (opcional)</Label>
-                  <Input
-                    id="piso"
-                    placeholder="5° B"
-                    value={formData.piso}
-                    onChange={(event) => setFormData({ ...formData, piso: event.target.value })}
-                    className="mt-1"
-                    disabled={submitting}
-                  />
-                </div>
-                <div className="grid gap-4 sm:grid-cols-2">
+            {isLocalPickup ? (
+              <Card className="rounded-[2rem]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Store className="h-5 w-5 text-red-600" />
+                    Retiro en local
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+                  {localPickupConfig.address ? (
+                    <p>
+                      <span className="font-semibold text-slate-900">Dirección: </span>
+                      {localPickupConfig.address}
+                    </p>
+                  ) : null}
+                  {localPickupConfig.schedule ? (
+                    <p>
+                      <span className="font-semibold text-slate-900">Horarios: </span>
+                      {localPickupConfig.schedule}
+                    </p>
+                  ) : null}
+                  {localPickupConfig.instructions ? (
+                    <p>
+                      <span className="font-semibold text-slate-900">Instrucciones: </span>
+                      {localPickupConfig.instructions}
+                    </p>
+                  ) : null}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="rounded-[2rem]">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <MapPin className="h-5 w-5 text-red-600" />
+                    Dirección de envío
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="ciudad">Ciudad *</Label>
+                    <Label htmlFor="nombre">Nombre completo *</Label>
                     <Input
-                      id="ciudad"
-                      placeholder="Buenos Aires"
-                      value={formData.ciudad}
-                      onChange={(event) => setFormData({ ...formData, ciudad: event.target.value })}
+                      id="nombre"
+                      placeholder="Juan Pérez"
+                      value={formData.nombre}
+                      onChange={(event) => setFormData({ ...formData, nombre: event.target.value })}
                       className="mt-1"
                       disabled={submitting}
                     />
-                    {errors.ciudad && (
-                      <p className="mt-1 text-xs text-red-600">{errors.ciudad}</p>
+                    {errors.nombre && <p className="mt-1 text-xs text-red-600">{errors.nombre}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="dni">DNI (opcional)</Label>
+                    <Input
+                      id="dni"
+                      placeholder="12.345.678"
+                      value={formData.dni}
+                      onChange={(event) => setFormData({ ...formData, dni: event.target.value })}
+                      className="mt-1"
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="calle">Calle y número *</Label>
+                    <Input
+                      id="calle"
+                      placeholder="Av. Libertador 1234"
+                      value={formData.calle}
+                      onChange={(event) => setFormData({ ...formData, calle: event.target.value })}
+                      className="mt-1"
+                      disabled={submitting}
+                    />
+                    {errors.calle && <p className="mt-1 text-xs text-red-600">{errors.calle}</p>}
+                  </div>
+                  <div>
+                    <Label htmlFor="piso">Piso/Departamento (opcional)</Label>
+                    <Input
+                      id="piso"
+                      placeholder="5° B"
+                      value={formData.piso}
+                      onChange={(event) => setFormData({ ...formData, piso: event.target.value })}
+                      className="mt-1"
+                      disabled={submitting}
+                    />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <Label htmlFor="ciudad">Ciudad *</Label>
+                      <Input
+                        id="ciudad"
+                        placeholder="Buenos Aires"
+                        value={formData.ciudad}
+                        onChange={(event) => setFormData({ ...formData, ciudad: event.target.value })}
+                        className="mt-1"
+                        disabled={submitting}
+                      />
+                      {errors.ciudad && (
+                        <p className="mt-1 text-xs text-red-600">{errors.ciudad}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Label htmlFor="provincia">Provincia *</Label>
+                      <Select
+                        value={formData.provincia}
+                        onValueChange={(value) => {
+                          if (value) {
+                            setFormData({ ...formData, provincia: value })
+                          }
+                        }}
+                        disabled={submitting}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="Seleccionar" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {provincias.map((prov) => (
+                            <SelectItem key={prov} value={prov}>
+                              {prov}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      {errors.provincia && (
+                        <p className="mt-1 text-xs text-red-600">{errors.provincia}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <Label htmlFor="codigoPostal">Código postal *</Label>
+                    <Input
+                      id="codigoPostal"
+                      placeholder="1010"
+                      value={formData.codigoPostal}
+                      onChange={(event) =>
+                        setFormData({ ...formData, codigoPostal: event.target.value })
+                      }
+                      className="mt-1"
+                      disabled={submitting}
+                    />
+                    {errors.codigoPostal && (
+                      <p className="mt-1 text-xs text-red-600">{errors.codigoPostal}</p>
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="provincia">Provincia *</Label>
-                    <Select
-                      value={formData.provincia}
-                      onValueChange={(value) => {
-                        if (value) {
-                          setFormData({ ...formData, provincia: value })
-                        }
-                      }}
+                    <Label htmlFor="referencias">Referencias (opcional)</Label>
+                    <textarea
+                      id="referencias"
+                      placeholder="Ej: Casa con portón azul, timbre en la derecha"
+                      value={formData.referencias}
+                      onChange={(event) =>
+                        setFormData({ ...formData, referencias: event.target.value })
+                      }
+                      rows={3}
                       disabled={submitting}
-                    >
-                      <SelectTrigger className="mt-1">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {provincias.map((prov) => (
-                          <SelectItem key={prov} value={prov}>
-                            {prov}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.provincia && (
-                      <p className="mt-1 text-xs text-red-600">{errors.provincia}</p>
-                    )}
+                      className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-ring/50"
+                    />
                   </div>
-                </div>
-                <div>
-                  <Label htmlFor="codigoPostal">Código postal *</Label>
-                  <Input
-                    id="codigoPostal"
-                    placeholder="1010"
-                    value={formData.codigoPostal}
-                    onChange={(event) =>
-                      setFormData({ ...formData, codigoPostal: event.target.value })
-                    }
-                    className="mt-1"
-                    disabled={submitting}
-                  />
-                  {errors.codigoPostal && (
-                    <p className="mt-1 text-xs text-red-600">{errors.codigoPostal}</p>
-                  )}
-                </div>
-                <div>
-                  <Label htmlFor="referencias">Referencias (opcional)</Label>
-                  <textarea
-                    id="referencias"
-                    placeholder="Ej: Casa con portón azul, timbre en la derecha"
-                    value={formData.referencias}
-                    onChange={(event) =>
-                      setFormData({ ...formData, referencias: event.target.value })
-                    }
-                    rows={3}
-                    disabled={submitting}
-                    className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-ring/50"
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="rounded-[2rem]">
               <CardHeader>
@@ -889,13 +1017,11 @@ export default function CheckoutPage() {
                       </p>
                     </div>
                     <span className="text-sm font-semibold text-slate-900">
-                      {qualifiesForFreeShipping
+                      {method.id === 'local_pickup' || method.price === 0 || qualifiesForFreeShipping
                         ? 'Gratis'
                         : method.id === 'free'
                           ? '—'
-                          : method.price === 0
-                            ? 'Gratis'
-                            : `$${method.price.toLocaleString('es-AR')}`}
+                          : `$${method.price.toLocaleString('es-AR')}`}
                     </span>
                   </label>
                 ))}
@@ -1023,7 +1149,11 @@ export default function CheckoutPage() {
                   <div className="flex justify-between text-slate-600">
                     <span>Envío</span>
                     <span>
-                      {shippingCost === 0 ? 'Gratis' : `$${shippingCost.toLocaleString('es-AR')}`}
+                      {isLocalPickup
+                        ? 'Retiro en local (Gratis)'
+                        : shippingCost === 0
+                          ? 'Gratis'
+                          : `$${shippingCost.toLocaleString('es-AR')}`}
                     </span>
                   </div>
                 </div>

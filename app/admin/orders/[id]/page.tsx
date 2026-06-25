@@ -7,6 +7,7 @@ import {
   Mail,
   MapPin,
   Phone,
+  Store,
   User,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
@@ -35,6 +36,7 @@ type DbOrder = {
   status: OrderStatus
   payment_status: PaymentStatus
   payment_method: string | null
+  shipping_method: string | null
   shipping_cost: number
   subtotal: number
   total: number
@@ -127,6 +129,21 @@ function formatDate(value: string) {
 
 function formatOrderNumber(id: string) {
   return `#${id.slice(0, 8).toUpperCase()}`
+}
+
+function getShippingMethodLabel(method: string | null): string {
+  switch (method) {
+    case 'local_pickup':
+      return 'Retiro en local'
+    case 'standard':
+      return 'Envío estándar'
+    case 'express':
+      return 'Envío express'
+    case 'free':
+      return 'Envío gratis'
+    default:
+      return 'Envío a domicilio'
+  }
 }
 
 function getPaymentMethodLabel(method: string | null): string {
@@ -231,7 +248,7 @@ async function getOrderDetail(orderId: string): Promise<OrderDetailData | null |
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .select(
-      'id, store_id, customer_name, customer_email, customer_phone, customer_address, status, payment_status, payment_method, shipping_cost, subtotal, total, discount_code, discount_amount, notes, created_at',
+      'id, store_id, customer_name, customer_email, customer_phone, customer_address, status, payment_status, payment_method, shipping_method, shipping_cost, subtotal, total, discount_code, discount_amount, notes, created_at',
     )
     .eq('id', orderId)
     .eq('store_id', store.id)
@@ -343,6 +360,7 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
 
   const { order, items, storeId } = result
   const discountAmount = Number(order.discount_amount ?? 0)
+  const isLocalPickup = order.shipping_method === 'local_pickup'
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -368,6 +386,9 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
                 className={`rounded-full px-3 py-1 text-sm font-semibold ${paymentStatusBadgeClasses(order.payment_status)}`}
               >
                 Pago: {paymentStatusLabel(order.payment_status)}
+              </span>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+                {getShippingMethodLabel(order.shipping_method)}
               </span>
             </div>
             <p className="text-sm text-muted-foreground">
@@ -438,15 +459,28 @@ export default function OrderDetailPage({ params }: OrderDetailPageProps) {
 
             <Card>
               <CardHeader>
-                <CardTitle>Dirección de envío</CardTitle>
-                <CardDescription>Domicilio de entrega del pedido.</CardDescription>
+                <CardTitle>
+                  {isLocalPickup ? 'Retiro en local' : 'Dirección de envío'}
+                </CardTitle>
+                <CardDescription>
+                  {isLocalPickup
+                    ? 'El cliente retirará el pedido en el local.'
+                    : 'Domicilio de entrega del pedido.'}
+                </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="rounded-3xl border border-border bg-slate-50 p-4">
                   <div className="flex items-start gap-3">
-                    <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
+                    {isLocalPickup ? (
+                      <Store className="mt-1 h-4 w-4 text-muted-foreground" />
+                    ) : (
+                      <MapPin className="mt-1 h-4 w-4 text-muted-foreground" />
+                    )}
                     <p className="text-sm text-foreground">
-                      {order.customer_address || 'Sin dirección registrada'}
+                      {order.customer_address ||
+                        (isLocalPickup
+                          ? 'Retiro en local sin dirección registrada'
+                          : 'Sin dirección registrada')}
                     </p>
                   </div>
                 </div>

@@ -31,6 +31,10 @@ type DbStore = {
   shipping_standard_cost: number | null
   shipping_express_cost: number | null
   free_shipping_enabled: boolean | null
+  enable_local_pickup: boolean | null
+  pickup_address: string | null
+  pickup_instructions: string | null
+  pickup_schedule: string | null
 }
 
 type SettingsData = {
@@ -49,6 +53,8 @@ type SettingsPageProps = {
     confirm_delete_mp?: string
     shipping_saved?: string
     shipping_error?: string
+    pickup_saved?: string
+    pickup_error?: string
     hero_saved?: string
     hero_error?: string
   }>
@@ -128,7 +134,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled',
+      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -506,6 +512,84 @@ export async function saveShippingSettings(formData: FormData): Promise<void> {
   redirect('/admin/settings?shipping_saved=1')
 }
 
+export async function saveLocalPickupSettings(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const enableLocalPickup = formData.get('enableLocalPickup') === 'true'
+  const pickupAddress = formData.get('pickupAddress')
+  const pickupInstructions = formData.get('pickupInstructions')
+  const pickupSchedule = formData.get('pickupSchedule')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?pickup_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  const parsedPickupAddress =
+    typeof pickupAddress === 'string' && pickupAddress.trim() ? pickupAddress.trim() : null
+
+  const parsedPickupInstructions =
+    typeof pickupInstructions === 'string' && pickupInstructions.trim()
+      ? pickupInstructions.trim()
+      : null
+
+  const parsedPickupSchedule =
+    typeof pickupSchedule === 'string' && pickupSchedule.trim() ? pickupSchedule.trim() : null
+
+  if (enableLocalPickup && !parsedPickupAddress) {
+    redirect(
+      `/admin/settings?pickup_error=${encodeURIComponent('La dirección del local es obligatoria cuando el retiro está habilitado.')}`,
+    )
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?pickup_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      enable_local_pickup: enableLocalPickup,
+      pickup_address: parsedPickupAddress,
+      pickup_instructions: parsedPickupInstructions,
+      pickup_schedule: parsedPickupSchedule,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?pickup_error=${encodeURIComponent('No se pudo guardar la configuración de retiro en local.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront/checkout')
+  redirect('/admin/settings?pickup_saved=1')
+}
+
 export default async function AdminSettingsPage({ searchParams }: SettingsPageProps) {
   const {
     saved,
@@ -516,6 +600,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     confirm_delete_mp,
     shipping_saved,
     shipping_error,
+    pickup_saved,
+    pickup_error,
     hero_saved,
     hero_error,
   } = await searchParams
@@ -537,6 +623,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     store.shipping_standard_cost ?? DEFAULT_SHIPPING_STANDARD_COST,
   )
   const shippingExpressCost = Number(store.shipping_express_cost ?? DEFAULT_SHIPPING_EXPRESS_COST)
+  const enableLocalPickup = store.enable_local_pickup ?? false
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -589,6 +676,18 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {shipping_error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {shipping_error}
+          </div>
+        ) : null}
+
+        {pickup_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Configuración de retiro en local guardada correctamente
+          </div>
+        ) : null}
+
+        {pickup_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {pickup_error}
           </div>
         ) : null}
 
@@ -934,6 +1033,75 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
 
               <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
                 Guardar configuración de envíos
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Retiro en local</CardTitle>
+            <CardDescription>
+              Permití que tus clientes retiren sus pedidos en tu local sin costo de envío.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={saveLocalPickupSettings} className="space-y-6">
+              <input type="hidden" name="storeId" value={store.id} />
+
+              <label className="flex items-center gap-3 rounded-lg border border-border bg-white p-4">
+                <input
+                  type="checkbox"
+                  name="enableLocalPickup"
+                  value="true"
+                  defaultChecked={enableLocalPickup}
+                  className="h-4 w-4 rounded border border-input text-red-600 accent-red-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Habilitar retiro en local</p>
+                  <p className="text-xs text-muted-foreground">
+                    Si está activo, los clientes podrán elegir retirar el pedido en tu local.
+                  </p>
+                </div>
+              </label>
+
+              <div className="space-y-2">
+                <Label htmlFor="pickupAddress">Dirección del local</Label>
+                <Input
+                  id="pickupAddress"
+                  name="pickupAddress"
+                  defaultValue={store.pickup_address ?? ''}
+                  placeholder="Av. Corrientes 1234, CABA"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pickupSchedule">Horarios de retiro</Label>
+                <Input
+                  id="pickupSchedule"
+                  name="pickupSchedule"
+                  defaultValue={store.pickup_schedule ?? ''}
+                  placeholder="Lunes a Viernes 9-18hs"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="pickupInstructions">Instrucciones para el cliente</Label>
+                <textarea
+                  id="pickupInstructions"
+                  name="pickupInstructions"
+                  rows={3}
+                  defaultValue={store.pickup_instructions ?? ''}
+                  placeholder="Ej: Tocar timbre 2, pedir por nombre en recepción..."
+                  className={cn(
+                    'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition',
+                    'focus-visible:border-ring focus-visible:ring-ring/50',
+                  )}
+                />
+              </div>
+
+              <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                Guardar configuración de retiro
               </Button>
             </form>
           </CardContent>
