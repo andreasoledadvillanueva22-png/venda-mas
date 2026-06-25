@@ -35,6 +35,11 @@ type DbStore = {
   pickup_address: string | null
   pickup_instructions: string | null
   pickup_schedule: string | null
+  bank_name: string | null
+  cbu: string | null
+  alias: string | null
+  account_holder: string | null
+  cuit: string | null
 }
 
 type SettingsData = {
@@ -55,6 +60,8 @@ type SettingsPageProps = {
     shipping_error?: string
     pickup_saved?: string
     pickup_error?: string
+    bank_saved?: string
+    bank_error?: string
     hero_saved?: string
     hero_error?: string
   }>
@@ -109,6 +116,17 @@ function parseShippingAmount(
   return { value: parsed }
 }
 
+function parseRequiredBankField(
+  value: FormDataEntryValue | null,
+  fieldLabel: string,
+): { value: string } | { error: string } {
+  if (typeof value !== 'string' || !value.trim()) {
+    return { error: `${fieldLabel} es obligatorio.` }
+  }
+
+  return { value: value.trim() }
+}
+
 async function getSettingsData(): Promise<SettingsData | null> {
   const supabase = await createClient()
 
@@ -134,7 +152,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule',
+      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -590,6 +608,89 @@ export async function saveLocalPickupSettings(formData: FormData): Promise<void>
   redirect('/admin/settings?pickup_saved=1')
 }
 
+export async function saveBankDetails(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const bankName = parseRequiredBankField(formData.get('bankName'), 'El banco')
+  const cbu = parseRequiredBankField(formData.get('cbu'), 'El CBU')
+  const alias = parseRequiredBankField(formData.get('alias'), 'El alias')
+  const accountHolder = parseRequiredBankField(formData.get('accountHolder'), 'El titular')
+  const cuit = parseRequiredBankField(formData.get('cuit'), 'El CUIT')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?bank_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  if ('error' in bankName) {
+    redirect(`/admin/settings?bank_error=${encodeURIComponent(bankName.error)}`)
+  }
+
+  if ('error' in cbu) {
+    redirect(`/admin/settings?bank_error=${encodeURIComponent(cbu.error)}`)
+  }
+
+  if ('error' in alias) {
+    redirect(`/admin/settings?bank_error=${encodeURIComponent(alias.error)}`)
+  }
+
+  if ('error' in accountHolder) {
+    redirect(`/admin/settings?bank_error=${encodeURIComponent(accountHolder.error)}`)
+  }
+
+  if ('error' in cuit) {
+    redirect(`/admin/settings?bank_error=${encodeURIComponent(cuit.error)}`)
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?bank_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      bank_name: bankName.value,
+      cbu: cbu.value,
+      alias: alias.value,
+      account_holder: accountHolder.value,
+      cuit: cuit.value,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?bank_error=${encodeURIComponent('No se pudieron guardar los datos bancarios.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront/checkout')
+  redirect('/admin/settings?bank_saved=1')
+}
+
 export default async function AdminSettingsPage({ searchParams }: SettingsPageProps) {
   const {
     saved,
@@ -602,6 +703,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     shipping_error,
     pickup_saved,
     pickup_error,
+    bank_saved,
+    bank_error,
     hero_saved,
     hero_error,
   } = await searchParams
@@ -688,6 +791,18 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {pickup_error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {pickup_error}
+          </div>
+        ) : null}
+
+        {bank_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Datos bancarios guardados correctamente
+          </div>
+        ) : null}
+
+        {bank_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {bank_error}
           </div>
         ) : null}
 
@@ -1102,6 +1217,85 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
 
               <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
                 Guardar configuración de retiro
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Transferencia bancaria</CardTitle>
+            <CardDescription>
+              Configurá los datos para que tus clientes puedan pagar por transferencia en el checkout.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={saveBankDetails} className="space-y-6">
+              <input type="hidden" name="storeId" value={store.id} />
+
+              <div className="grid gap-6 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="bankName">Banco</Label>
+                  <Input
+                    id="bankName"
+                    name="bankName"
+                    defaultValue={store.bank_name ?? ''}
+                    placeholder="Ej: Banco Galicia"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="accountHolder">Titular de la cuenta</Label>
+                  <Input
+                    id="accountHolder"
+                    name="accountHolder"
+                    defaultValue={store.account_holder ?? ''}
+                    placeholder="Nombre y apellido o razón social"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2 sm:col-span-2">
+                  <Label htmlFor="cbu">CBU</Label>
+                  <Input
+                    id="cbu"
+                    name="cbu"
+                    defaultValue={store.cbu ?? ''}
+                    placeholder="0000000000000000000000"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="alias">Alias</Label>
+                  <Input
+                    id="alias"
+                    name="alias"
+                    defaultValue={store.alias ?? ''}
+                    placeholder="mi.tienda.alias"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="cuit">CUIT</Label>
+                  <Input
+                    id="cuit"
+                    name="cuit"
+                    defaultValue={store.cuit ?? ''}
+                    placeholder="20-12345678-9"
+                    required
+                  />
+                </div>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                Todos los campos son obligatorios para habilitar la transferencia bancaria en el checkout.
+              </p>
+
+              <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                Guardar datos bancarios
               </Button>
             </form>
           </CardContent>

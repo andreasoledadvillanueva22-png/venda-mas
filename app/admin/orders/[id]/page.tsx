@@ -151,6 +151,7 @@ function getPaymentMethodLabel(method: string | null): string {
     case 'mercadopago':
       return 'Mercado Pago'
     case 'transfer':
+    case 'bank_transfer':
       return 'Transferencia'
     case 'effectivo':
       return 'Efectivo'

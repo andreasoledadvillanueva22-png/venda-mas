@@ -91,9 +91,109 @@ type ShippingMethodOption = {
 
 const paymentMethods = [
   { id: 'mercadopago', label: 'Mercado Pago', icon: '💳' },
-  { id: 'transfer', label: 'Transferencia Bancaria', icon: '🏦' },
+  { id: 'bank_transfer', label: 'Transferencia Bancaria', icon: '🏦' },
   { id: 'effectivo', label: 'Efectivo Contra Entrega', icon: '💵' },
-]
+] as const
+
+type PaymentMethodId = (typeof paymentMethods)[number]['id']
+
+type BankDetailsConfig = {
+  bankName: string | null
+  cbu: string | null
+  alias: string | null
+  accountHolder: string | null
+  cuit: string | null
+}
+
+const DEFAULT_BANK_DETAILS: BankDetailsConfig = {
+  bankName: null,
+  cbu: null,
+  alias: null,
+  accountHolder: null,
+  cuit: null,
+}
+
+function isBankTransferConfigured(bankDetails: BankDetailsConfig): boolean {
+  return Boolean(
+    bankDetails.bankName?.trim() &&
+      bankDetails.cbu?.trim() &&
+      bankDetails.alias?.trim() &&
+      bankDetails.accountHolder?.trim() &&
+      bankDetails.cuit?.trim(),
+  )
+}
+
+function BankTransferDetails({ bankDetails }: { bankDetails: BankDetailsConfig }) {
+  const [copiedField, setCopiedField] = useState<'cbu' | 'alias' | null>(null)
+
+  const copyToClipboard = async (value: string, field: 'cbu' | 'alias') => {
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopiedField(field)
+      window.setTimeout(() => setCopiedField(null), 2000)
+    } catch {
+      setCopiedField(null)
+    }
+  }
+
+  return (
+    <div className="space-y-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+      <div>
+        <p className="font-semibold text-slate-900">Datos para transferir</p>
+        <p className="mt-2 text-slate-600">
+          Realizá la transferencia y enviá el comprobante por WhatsApp.
+        </p>
+      </div>
+
+      <div className="space-y-2">
+        <p>
+          <span className="font-semibold text-slate-900">Banco: </span>
+          {bankDetails.bankName}
+        </p>
+        <p>
+          <span className="font-semibold text-slate-900">Titular: </span>
+          {bankDetails.accountHolder}
+        </p>
+        <p>
+          <span className="font-semibold text-slate-900">CUIT: </span>
+          {bankDetails.cuit}
+        </p>
+      </div>
+
+      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <span className="font-semibold text-slate-900">CBU: </span>
+            <span className="font-mono">{bankDetails.cbu}</span>
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void copyToClipboard(bankDetails.cbu ?? '', 'cbu')}
+          >
+            {copiedField === 'cbu' ? 'CBU copiado' : 'Copiar CBU'}
+          </Button>
+        </div>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p>
+            <span className="font-semibold text-slate-900">Alias: </span>
+            <span className="font-mono">{bankDetails.alias}</span>
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void copyToClipboard(bankDetails.alias ?? '', 'alias')}
+          >
+            {copiedField === 'alias' ? 'Alias copiado' : 'Copiar alias'}
+          </Button>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 type CheckoutFormData = {
   email: string
@@ -258,6 +358,7 @@ type AuthenticatedStore = {
   name: string
   shippingConfig: ShippingConfig
   localPickupConfig: LocalPickupConfig
+  bankDetails: BankDetailsConfig
 }
 
 async function getAuthenticatedStore(
@@ -275,7 +376,7 @@ async function getAuthenticatedStore(
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule',
+      'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -306,6 +407,13 @@ async function getAuthenticatedStore(
       instructions: store.pickup_instructions ?? null,
       schedule: store.pickup_schedule ?? null,
     },
+    bankDetails: {
+      bankName: store.bank_name ?? null,
+      cbu: store.cbu ?? null,
+      alias: store.alias ?? null,
+      accountHolder: store.account_holder ?? null,
+      cuit: store.cuit ?? null,
+    },
   }
 }
 
@@ -322,6 +430,7 @@ export default function CheckoutPage() {
   const [localPickupConfig, setLocalPickupConfig] = useState<LocalPickupConfig>(
     DEFAULT_LOCAL_PICKUP_CONFIG,
   )
+  const [bankDetails, setBankDetails] = useState<BankDetailsConfig>(DEFAULT_BANK_DETAILS)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [paymentError, setPaymentError] = useState('')
@@ -356,6 +465,7 @@ export default function CheckoutPage() {
       if (store) {
         setShippingConfig(store.shippingConfig)
         setLocalPickupConfig(store.localPickupConfig)
+        setBankDetails(store.bankDetails)
       }
       setIsAuthenticated(Boolean(store))
       setAuthLoading(false)
@@ -424,6 +534,20 @@ export default function CheckoutPage() {
       setShippingMethod('standard')
     }
   }, [localPickupConfig.enabled, shippingMethod])
+
+  useEffect(() => {
+    if (!isBankTransferConfigured(bankDetails) && paymentMethod === 'bank_transfer') {
+      setPaymentMethod('mercadopago')
+    }
+  }, [bankDetails, paymentMethod])
+
+  const availablePaymentMethods = useMemo(
+    () =>
+      paymentMethods.filter(
+        (method) => method.id !== 'bank_transfer' || isBankTransferConfigured(bankDetails),
+      ),
+    [bankDetails],
+  )
 
   const isLocalPickup = shippingMethod === 'local_pickup'
 
@@ -601,7 +725,7 @@ export default function CheckoutPage() {
         customer_address: customerAddress,
         status: 'pending',
         payment_status: 'pending',
-        payment_method: paymentMethod as 'mercadopago' | 'transfer' | 'effectivo',
+        payment_method: paymentMethod as 'mercadopago' | 'bank_transfer' | 'effectivo',
         shipping_method: orderShippingMethod,
         shipping_cost: orderShippingCost,
         subtotal: orderSubtotal,
@@ -1036,7 +1160,7 @@ export default function CheckoutPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                {paymentMethods.map((method) => (
+                {availablePaymentMethods.map((method) => (
                   <label
                     key={method.id}
                     className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
@@ -1046,7 +1170,9 @@ export default function CheckoutPage() {
                       name="payment"
                       value={method.id}
                       checked={paymentMethod === method.id}
-                      onChange={(event) => setPaymentMethod(event.target.value)}
+                      onChange={(event) =>
+                        setPaymentMethod(event.target.value as PaymentMethodId)
+                      }
                       disabled={submitting}
                       className="h-4 w-4 accent-red-600"
                     />
@@ -1054,13 +1180,9 @@ export default function CheckoutPage() {
                     <span className="text-sm font-semibold text-slate-900">{method.label}</span>
                   </label>
                 ))}
-                {paymentMethod === 'transfer' && (
-                  <div className="rounded-lg bg-slate-50 p-4 text-sm text-slate-600">
-                    <p className="font-semibold text-slate-900">Datos de transferencia:</p>
-                    <p className="mt-2">CBU: 0072001720000000000000</p>
-                    <p>Alias: fashionstore.tienda</p>
-                  </div>
-                )}
+                {paymentMethod === 'bank_transfer' && isBankTransferConfigured(bankDetails) ? (
+                  <BankTransferDetails bankDetails={bankDetails} />
+                ) : null}
               </CardContent>
             </Card>
 
