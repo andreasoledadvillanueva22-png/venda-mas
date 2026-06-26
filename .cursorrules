@@ -1,0 +1,62 @@
+# VendaMás SaaS - Cursor Rules
+
+## Stack Tecnológico
+- **Framework:** Next.js 14 con App Router
+- **Lenguaje:** TypeScript (estricto)
+- **Base de datos:** Supabase (PostgreSQL)
+- **Estilos:** Tailwind CSS
+- **Deploy:** Vercel
+- **Pagos:** Mercado Pago (Checkout Pro)
+- **Auth:** Supabase Auth
+
+## Arquitectura
+- SaaS multi-tenant: cada usuario tiene su propia tienda
+- Rutas: `/admin/*` (dashboard), `/storefront/*` (tienda pública), `/auth/*` (login/registro)
+- Multi-tenancy por `store_id` en todas las tablas relacionadas
+- Subdominios wildcard: `tienda.vendemas.app` → `/storefront?store=tienda`
+- Checkout como invitado permitido (sin login obligatorio)
+
+## Reglas de Negocio Críticas
+1. **NUNCA** hardcodear credenciales de Mercado Pago (siempre usar `process.env` o `stores.mp_access_token`)
+2. **SIEMPRE** filtrar queries por `store_id` o `owner_id` para aislamiento multi-tenant
+3. **NUNCA** exponer datos de una tienda a otra (violación de RLS)
+4. Las credenciales de MP deben empezar con `APP_USR-` (producción), no `TEST-` (prueba)
+5. El slug de la tienda debe ser único (agregar sufijo numérico si existe)
+6. Checkout debe funcionar sin login (guest checkout)
+7. Webhooks de MP deben verificar que la orden pertenezca a la tienda correcta
+
+## Convenciones de Código
+- Usar Server Actions para mutaciones (no API routes cuando sea posible)
+- Componentes de cliente: `'use client'` al inicio
+- Validación con Zod o validación manual estricta
+- Manejo de errores: try/catch con logs y mensajes de usuario amigables
+- No usar `any` en TypeScript
+- Imports ordenados: primero externos, luego internos
+- Nombres de archivos: kebab-case para componentes, camelCase para librerías
+
+## Estructura de Base de Datos (Supabase)
+Tablas principales:
+- `profiles`: usuarios (id, email, name)
+- `stores`: tiendas (id, owner_id, name, slug, mp_access_token, mp_public_key, shipping_config, etc.)
+- `products`: productos (id, store_id, name, price, stock, image_url)
+- `orders`: órdenes (id, store_id, customer_name, customer_email, customer_phone, customer_address, total, status, shipping_method, payment_method, is_guest, profile_id)
+- `order_items`: items de orden (id, order_id, product_id, quantity, price)
+
+Políticas RLS:
+- Usuarios solo ven/editan sus propias tiendas y datos relacionados
+- Storefront puede leer datos públicos de tiendas (productos, info básica)
+- INSERT en orders/order_items permitido para cualquier usuario (invitados incluidos)
+
+## Deploy y Variables de Entorno
+- Vercel: `vercel --prod` para producción
+- Variables críticas: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_MP_CLIENT_ID`, `NEXT_MP_CLIENT_SECRET`, `NEXT_MP_REDIRECT_URI`
+- Migraciones SQL en carpeta `supabase/` con nombres descriptivos
+
+## Comportamiento Esperado de la IA
+- Antes de modificar código, leer archivos relevantes para entender contexto
+- Ejecutar `npm run build` después de cambios significativos
+- Si hay error de build, corregirlo antes de continuar
+- No romper funcionalidad existente al agregar nuevas features
+- Priorizar seguridad y aislamiento multi-tenant
+- Generar migraciones SQL cuando se modifique el schema
+- Documentar cambios importantes en `PROJECT_CONTEXT.md`
