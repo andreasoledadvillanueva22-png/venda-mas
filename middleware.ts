@@ -135,12 +135,71 @@ async function handleProtectedAuthRoutes(request: NextRequest): Promise<NextResp
   return supabaseResponse
 }
 
+function applyStoreTenantHeaders(
+  request: NextRequest,
+  response: NextResponse,
+  store: { id: string; slug: string },
+): NextResponse {
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-store-id', store.id)
+  requestHeaders.set('x-store-slug', store.slug)
+
+  const nextResponse = NextResponse.next({
+    request: { headers: requestHeaders },
+  })
+
+  nextResponse.cookies.set('storefront_slug', store.slug, {
+    path: '/',
+    maxAge: 60 * 60 * 24 * 30,
+    sameSite: 'lax',
+  })
+
+  return applyCookies(response, nextResponse)
+}
+
+async function resolveStorefrontTenant(
+  request: NextRequest,
+): Promise<{ id: string; slug: string } | null> {
+  const { pathname, searchParams } = request.nextUrl
+  const storeSlugFromQuery = searchParams.get('store')?.trim()
+
+  if (storeSlugFromQuery && pathname.startsWith('/storefront')) {
+    const store = await getStoreBySlug(storeSlugFromQuery)
+
+    if (store) {
+      return { id: store.id, slug: store.slug }
+    }
+
+    return null
+  }
+
+  const cookieSlug = request.cookies.get('storefront_slug')?.value?.trim()
+
+  if (cookieSlug && pathname.startsWith('/storefront')) {
+    const store = await getStoreBySlug(cookieSlug)
+
+    if (store) {
+      return { id: store.id, slug: store.slug }
+    }
+  }
+
+  return null
+}
+
 async function withTenantHeader(
   request: NextRequest,
   response: NextResponse,
 ): Promise<NextResponse> {
   const hostname = request.nextUrl.hostname
   const pathname = request.nextUrl.pathname
+
+  if (isPlatformHostname(hostname) && pathname.startsWith('/storefront')) {
+    const storefrontStore = await resolveStorefrontTenant(request)
+
+    if (storefrontStore) {
+      return applyStoreTenantHeaders(request, response, storefrontStore)
+    }
+  }
 
   if (!isPlatformHostname(hostname)) {
     const store = await getStoreByCustomDomain(hostname)
@@ -155,7 +214,7 @@ async function withTenantHeader(
 
       const requestHeaders = new Headers(request.headers)
       requestHeaders.set('x-store-id', store.id)
-      requestHeaders.set('x-custom-domain', '1')
+      requestHeaders.set('x-store-slug', store.slug)
 
       const rewrittenPath = rewriteCustomDomainPath(pathname)
 
@@ -192,6 +251,7 @@ async function withTenantHeader(
 
   const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-store-id', store.id)
+  requestHeaders.set('x-store-slug', store.slug)
 
   const nextResponse = NextResponse.next({
     request: { headers: requestHeaders },

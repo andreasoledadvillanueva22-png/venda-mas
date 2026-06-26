@@ -1,14 +1,13 @@
 import { use } from 'react'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import {
   ChevronRight,
   RotateCcw,
   Shield,
   Truck,
 } from 'lucide-react'
-import { createClient, getUser } from '@/lib/supabase/server'
-import { getStoreBySlug } from '@/lib/tenant'
+import { createClient } from '@/lib/supabase/server'
+import { resolveStorefrontStore } from '@/lib/storefront-server'
 import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { BuyNowButton } from '@/components/storefront/buy-now-button'
 import { Badge } from '@/components/ui/badge'
@@ -68,37 +67,8 @@ function calculateDiscountPercent(price: number, compareAtPrice: number | null):
 }
 
 async function resolveStoreId(storeSlug?: string): Promise<string | null> {
-  const headersList = await headers()
-  const storeIdFromHeader = headersList.get('x-store-id')
-
-  if (storeIdFromHeader) {
-    return storeIdFromHeader
-  }
-
-  if (storeSlug) {
-    const store = await getStoreBySlug(storeSlug)
-    return store?.id ?? null
-  }
-
-  const user = await getUser()
-
-  if (!user) {
-    return null
-  }
-
-  const supabase = await createClient()
-
-  const { data: store, error } = await supabase
-    .from('stores')
-    .select('id')
-    .eq('owner_id', user.id)
-    .maybeSingle()
-
-  if (error || !store) {
-    return null
-  }
-
-  return store.id
+  const store = await resolveStorefrontStore(storeSlug)
+  return store?.id ?? null
 }
 
 async function getProductDetail(

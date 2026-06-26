@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, ShoppingCart, Filter, X } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
+import { storefrontHref } from '@/lib/storefront'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -30,6 +31,8 @@ export type CatalogProduct = {
 
 type ProductsCatalogProps = {
   products: CatalogProduct[]
+  storeSlug?: string | null
+  initialCategory?: string
 }
 
 function formatPrice(value: number) {
@@ -50,13 +53,26 @@ function getProductBadge(product: CatalogProduct): { label: string; className: s
   return null
 }
 
-export function ProductsCatalog({ products }: ProductsCatalogProps) {
+export function ProductsCatalog({
+  products,
+  storeSlug = null,
+  initialCategory,
+}: ProductsCatalogProps) {
   const [search, setSearch] = useState('')
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [priceMin, setPriceMin] = useState('')
   const [priceMax, setPriceMax] = useState('')
   const [sortBy, setSortBy] = useState('recent')
   const { addToCart } = useCart()
+
+  useEffect(() => {
+    if (initialCategory?.trim()) {
+      setSelectedCategories([decodeURIComponent(initialCategory.trim())])
+    }
+  }, [initialCategory])
+
+  const productHref = (productId: string) =>
+    storefrontHref(`/storefront/product/${productId}`, storeSlug)
 
   const categories = useMemo(() => {
     return [...new Set(products.map((product) => product.category).filter(Boolean))]
@@ -256,7 +272,7 @@ export function ProductsCatalog({ products }: ProductsCatalogProps) {
                 return (
                   <Card key={product.id} className="overflow-hidden transition-shadow hover:shadow-lg">
                     <CardContent className="p-0">
-                      <Link href={`/storefront/product/${product.id}`} className="group block">
+                      <Link href={productHref(product.id)} className="group block">
                         <div className="relative aspect-square overflow-hidden bg-slate-100">
                           {imageUrl ? (
                             <img

@@ -1,30 +1,33 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import type { Metadata } from 'next'
 import {
   ArrowRight,
-  Home,
-  Heart,
-  PawPrint,
-  Shield,
   Star,
   CheckCircle2,
   Store,
 } from 'lucide-react'
-import { createClient, getUser } from '@/lib/supabase/server'
 import type { CatalogProduct } from '@/components/storefront/products-catalog'
 import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
+import { StoreNotFound } from '@/components/storefront/store-not-found'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/server'
+import {
+  getStoreCategories,
+  resolveStorefrontStore,
+} from '@/lib/storefront-server'
+import { storefrontHref } from '@/lib/storefront'
 
 const BRAND_RED = '#FC0303'
 
-const categories = [
-  { name: 'Hogar', icon: Home, color: 'from-blue-500 to-blue-700', description: 'Productos para tu hogar' },
-  { name: 'Suplementos', icon: Heart, color: 'from-green-500 to-green-700', description: 'Bienestar y salud' },
-  { name: 'Mascotas', icon: PawPrint, color: 'from-purple-500 to-purple-700', description: 'Cuidá a tu mascota' },
-  { name: 'Higiene', icon: Shield, color: 'from-pink-500 to-pink-700', description: 'Cuidado personal' },
+const CATEGORY_COLORS = [
+  'from-blue-500 to-blue-700',
+  'from-green-500 to-green-700',
+  'from-purple-500 to-purple-700',
+  'from-pink-500 to-pink-700',
+  'from-amber-500 to-amber-700',
+  'from-cyan-500 to-cyan-700',
 ]
 
 const testimonials = [
@@ -69,12 +72,6 @@ type RecentPurchaseNotification = {
 
 type StorefrontPageProps = {
   searchParams: Promise<{ store?: string }>
-}
-
-type StoreInfo = {
-  id: string
-  name: string
-  heroImageUrl: string | null
 }
 
 type DbProduct = {
@@ -132,73 +129,6 @@ function shuffleProducts<T>(items: T[]): T[] {
 
 function getRandomPurchaseMinutes(): number {
   return Math.floor(Math.random() * (30 - 5 + 1)) + 5
-}
-
-async function resolveStore(storeSlug?: string): Promise<StoreInfo | null> {
-  const headersList = await headers()
-  const storeIdFromHeader = headersList.get('x-store-id')
-
-  if (storeIdFromHeader) {
-    const supabase = await createClient()
-    const { data: store, error } = await supabase
-      .from('stores')
-      .select('id, name, hero_image_url')
-      .eq('id', storeIdFromHeader)
-      .maybeSingle()
-
-    if (error || !store) {
-      return null
-    }
-
-    return {
-      id: store.id,
-      name: store.name,
-      heroImageUrl: store.hero_image_url ?? null,
-    }
-  }
-
-  if (storeSlug) {
-    const supabase = await createClient()
-    const { data: store, error } = await supabase
-      .from('stores')
-      .select('id, name, hero_image_url')
-      .eq('slug', storeSlug)
-      .maybeSingle()
-
-    if (error || !store) {
-      return null
-    }
-
-    return {
-      id: store.id,
-      name: store.name,
-      heroImageUrl: store.hero_image_url ?? null,
-    }
-  }
-
-  const user = await getUser()
-
-  if (!user) {
-    return null
-  }
-
-  const supabase = await createClient()
-
-  const { data: store, error } = await supabase
-    .from('stores')
-    .select('id, name, hero_image_url')
-    .eq('owner_id', user.id)
-    .maybeSingle()
-
-  if (error || !store) {
-    return null
-  }
-
-  return {
-    id: store.id,
-    name: store.name,
-    heroImageUrl: store.hero_image_url ?? null,
-  }
 }
 
 async function getHomepageProducts(storeId: string): Promise<CatalogProduct[]> {
@@ -299,21 +229,23 @@ async function getPromoProducts(storeId: string): Promise<CatalogProduct[]> {
     .slice(0, 3)
 }
 
-function buildKeywords(storeName: string): string {
-  const categoryKeywords = categories.map((category) => category.name).join(', ')
+function buildKeywords(storeName: string, categories: string[]): string {
+  const categoryKeywords = categories.join(', ')
   return `tienda online, compra online, envío gratis, Argentina, ${categoryKeywords}, ${storeName}`
 }
 
 export async function generateMetadata({ searchParams }: StorefrontPageProps): Promise<Metadata> {
   const params = await searchParams
-  const store = await resolveStore(params.store)
+  const store = await resolveStorefrontStore(params.store)
   const storeName = store?.name ?? 'Tienda Online'
+  const categories = store ? await getStoreCategories(store.id) : []
 
   return {
     title: `${storeName} - Tienda Online con Envío a Toda Argentina`,
     description:
+      store?.description ??
       'Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago.',
-    keywords: buildKeywords(storeName),
+    keywords: buildKeywords(storeName, categories),
   }
 }
 
@@ -418,15 +350,39 @@ function RecentPurchaseNotifications({
 
 export default async function StorefrontPage({ searchParams }: StorefrontPageProps) {
   const params = await searchParams
-  const store = await resolveStore(params.store)
-  const storeName = store?.name ?? 'Tu Tienda'
-  const heroImageUrl = store?.heroImageUrl ?? null
-  const featuredProducts = store ? await getHomepageProducts(store.id) : []
-  const promoProducts = store ? await getPromoProducts(store.id) : []
-  const popupProducts = store ? await getPopupProducts(store.id) : []
+  const requestedSlug = params.store?.trim()
+
+  if (requestedSlug) {
+    const storeBySlug = await resolveStorefrontStore(requestedSlug)
+    if (!storeBySlug) {
+      return <StoreNotFound />
+    }
+  }
+
+  const store = await resolveStorefrontStore(params.store)
+
+  if (!store) {
+    return <StoreNotFound />
+  }
+
+  const storeName = store.name
+  const heroImageUrl = store.heroImageUrl
+  const storeCategories = await getStoreCategories(store.id)
+  const featuredProducts = await getHomepageProducts(store.id)
+  const promoProducts = await getPromoProducts(store.id)
+  const popupProducts = await getPopupProducts(store.id)
   const recentPurchaseNotifications = buildRecentPurchaseNotifications(popupProducts)
   const promoSectionProducts =
     promoProducts.length > 0 ? promoProducts : featuredProducts.slice(0, 3)
+
+  const productsHref = storefrontHref('/storefront/products', store.slug)
+  const productHref = (productId: string) =>
+    storefrontHref(`/storefront/product/${productId}`, store.slug)
+  const categoryHref = (category: string) =>
+    storefrontHref(
+      `/storefront/products?category=${encodeURIComponent(category)}`,
+      store.slug,
+    )
 
   return (
     <div>
@@ -454,7 +410,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
               </p>
               <div className="flex flex-wrap gap-4">
                 <Link
-                  href="/storefront/products"
+                  href={productsHref}
                   className="inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
                   style={{ backgroundColor: BRAND_RED }}
                 >
@@ -477,37 +433,35 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       </section>
 
       {/* CATEGORÍAS */}
-      <section className="bg-white py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
-              COMPRAR POR CATEGORÍA
-            </p>
-            <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
-              Explorá nuestras categorías
-            </h2>
-          </div>
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            {categories.map((cat) => {
-              const Icon = cat.icon
-              return (
+      {storeCategories.length > 0 ? (
+        <section className="bg-white py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+                COMPRAR POR CATEGORÍA
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
+                Explorá nuestras categorías
+              </h2>
+            </div>
+            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {storeCategories.map((category, index) => (
                 <Link
-                  key={cat.name}
-                  href={`/storefront/products?category=${cat.name}`}
-                  className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${cat.color} p-8 text-white transition-transform hover:scale-105`}
+                  key={category}
+                  href={categoryHref(category)}
+                  className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${CATEGORY_COLORS[index % CATEGORY_COLORS.length]} p-8 text-white transition-transform hover:scale-105`}
                 >
                   <div className="relative z-10">
-                    <Icon className="mb-4 h-10 w-10" />
-                    <h3 className="text-2xl font-bold">{cat.name}</h3>
-                    <p className="mt-2 text-sm text-white/80">{cat.description}</p>
+                    <h3 className="text-2xl font-bold">{category}</h3>
+                    <p className="mt-2 text-sm text-white/80">Ver productos de {category}</p>
                     <ArrowRight className="mt-4 h-5 w-5 transition-transform group-hover:translate-x-1" />
                   </div>
                 </Link>
-              )
-            })}
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {/* PRODUCTOS DESTACADOS */}
       <section className="bg-slate-50 py-16 sm:py-20">
@@ -537,7 +491,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                 return (
                   <Card key={product.id} className="group overflow-hidden transition-shadow hover:shadow-xl">
                     <CardContent className="p-0">
-                      <Link href={`/storefront/product/${product.id}`} className="block">
+                      <Link href={productHref(product.id)} className="block">
                         <div className="relative aspect-square overflow-hidden bg-slate-100">
                           {imageUrl ? (
                             <img
@@ -586,7 +540,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
 
           <div className="mt-12 text-center">
             <Link
-              href="/storefront/products"
+              href={productsHref}
               className="inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
               style={{ backgroundColor: BRAND_RED }}
             >
@@ -622,7 +576,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                     className="group overflow-hidden rounded-2xl border border-slate-100 shadow-md transition-shadow hover:shadow-xl"
                   >
                     <CardContent className="p-0">
-                      <Link href={`/storefront/product/${product.id}`} className="block">
+                      <Link href={productHref(product.id)} className="block">
                         <div className="relative aspect-square overflow-hidden bg-slate-100">
                           {imageUrl ? (
                             <img
