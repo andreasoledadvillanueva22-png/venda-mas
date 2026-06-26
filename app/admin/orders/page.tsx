@@ -15,7 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 
-type OrderStatus = 'pending' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
+type OrderStatus = 'pending' | 'pending_payment' | 'paid' | 'shipped' | 'delivered' | 'cancelled'
 type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded'
 
 type DbOrder = {

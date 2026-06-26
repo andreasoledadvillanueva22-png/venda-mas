@@ -117,7 +117,8 @@ function maskMercadoPagoCredential(value: string | null): string {
 }
 
 function isValidMercadoPagoCredential(value: string): boolean {
-  return value.trim().startsWith('APP_USR-')
+  const normalized = value.trim()
+  return normalized.startsWith('APP_USR-') || normalized.startsWith('TEST-')
 }
 
 function parseShippingAmount(
@@ -362,13 +363,13 @@ export async function saveMercadoPagoCredentials(formData: FormData): Promise<vo
 
   if (!isValidMercadoPagoCredential(normalizedPublicKey)) {
     redirect(
-      `/admin/settings?mp_credentials_error=${encodeURIComponent('La Public Key debe comenzar con APP_USR-.')}`,
+      `/admin/settings?mp_credentials_error=${encodeURIComponent('La Public Key debe comenzar con APP_USR- o TEST-.')}`,
     )
   }
 
   if (!isValidMercadoPagoCredential(normalizedAccessToken)) {
     redirect(
-      `/admin/settings?mp_credentials_error=${encodeURIComponent('El Access Token debe comenzar con APP_USR-.')}`,
+      `/admin/settings?mp_credentials_error=${encodeURIComponent('El Access Token debe comenzar con APP_USR- o TEST-.')}`,
     )
   }
 

@@ -17,8 +17,6 @@ type MercadoPagoPaymentResponse = {
 type OrderUpdatePayload = {
   status: string
   payment_status: string
-  mp_payment_id?: string
-  paid_at?: string
 }
 
 type StoreToken = {
@@ -44,15 +42,17 @@ function buildOrderUpdate(
   switch (mpStatus) {
     case 'approved':
       return {
-        status: 'approved',
+        status: 'paid',
         payment_status: 'paid',
-        mp_payment_id: paymentId,
-        paid_at: new Date().toISOString(),
       }
     case 'rejected':
+      return {
+        status: 'pending_payment',
+        payment_status: 'failed',
+      }
     case 'cancelled':
       return {
-        status: 'failed',
+        status: 'cancelled',
         payment_status: 'failed',
       }
     case 'pending':
