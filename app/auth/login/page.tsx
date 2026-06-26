@@ -14,6 +14,7 @@ import {
   createClient,
   getSiteOrigin,
 } from '@/lib/supabase/client'
+import { completeOnboardingRequest } from '@/lib/onboarding-client'
 import Link from 'next/link'
 
 function getRedirectPath(searchParams: URLSearchParams): string {
@@ -102,6 +103,7 @@ function LoginPageContent() {
       }
 
       if (data.user) {
+        await completeOnboardingRequest()
         console.log('[login] redirecting to', redirectUrl)
         window.location.href = redirectUrl
         return

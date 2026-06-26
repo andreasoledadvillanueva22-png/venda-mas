@@ -12,7 +12,10 @@ export interface CartItem {
 
 interface CartContextType {
   items: CartItem[]
-  addToCart: (product: { id: string; name: string; price: number; image: string }) => void
+  addToCart: (
+    product: { id: string; name: string; price: number; image: string },
+    options?: { openDrawer?: boolean },
+  ) => void
   removeFromCart: (id: string) => void
   updateQuantity: (id: string, quantity: number) => void
   clearCart: () => void
@@ -45,17 +48,25 @@ export function CartProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('cart', JSON.stringify(items))
   }, [items])
 
-  const addToCart = (product: { id: string; name: string; price: number; image: string }) => {
+  const addToCart = (
+    product: { id: string; name: string; price: number; image: string },
+    options?: { openDrawer?: boolean },
+  ) => {
     setItems((prev) => {
       const existing = prev.find((item) => item.id === product.id)
-      if (existing) {
-        return prev.map((item) =>
-          item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-        )
-      }
-      return [...prev, { ...product, quantity: 1 }]
+      const next = existing
+        ? prev.map((item) =>
+            item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item,
+          )
+        : [...prev, { ...product, quantity: 1 }]
+
+      localStorage.setItem('cart', JSON.stringify(next))
+      return next
     })
-    setIsCartOpen(true)
+
+    if (options?.openDrawer !== false) {
+      setIsCartOpen(true)
+    }
   }
 
   const removeFromCart = (id: string) => {

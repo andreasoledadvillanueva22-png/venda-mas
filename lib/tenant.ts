@@ -1,8 +1,11 @@
 import { createClient } from '@/lib/supabase/server'
+import {
+  isLocalhost,
+  isPlatformHostname,
+  normalizeHostname,
+  PLATFORM_DOMAIN,
+} from '@/lib/custom-domain'
 import type { NextRequest } from 'next/server'
-
-const PLATFORM_DOMAIN =
-  process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'vendamas.com.ar'
 
 const RESERVED_PATH_SEGMENTS = new Set([
   'admin',
@@ -19,6 +22,8 @@ export type Store = {
   name: string
   slug: string
   domain: string | null
+  custom_domain: string | null
+  domain_verified: boolean
   logo_url: string | null
   description: string | null
   primary_color: string
@@ -28,13 +33,17 @@ export type Store = {
   updated_at: string
 }
 
-function normalizeHostname(hostname: string): string {
-  return hostname.split(':')[0].toLowerCase()
-}
+const STORE_SELECT_FIELDS =
+  'id, owner_id, name, slug, domain, custom_domain, domain_verified, logo_url, description, primary_color, secondary_color, settings, created_at, updated_at'
 
-function isLocalhost(hostname: string): boolean {
-  const host = normalizeHostname(hostname)
-  return host === 'localhost' || host === '127.0.0.1'
+function getTenantFromPath(pathname: string): string | null {
+  const [firstSegment] = pathname.split('/').filter(Boolean)
+
+  if (!firstSegment || RESERVED_PATH_SEGMENTS.has(firstSegment)) {
+    return null
+  }
+
+  return firstSegment
 }
 
 export function getTenantFromHost(hostname: string): string | null {
@@ -44,7 +53,7 @@ export function getTenantFromHost(hostname: string): string | null {
     return null
   }
 
-  const apexDomain = PLATFORM_DOMAIN.toLowerCase()
+  const apexDomain = PLATFORM_DOMAIN
 
   if (host === apexDomain || host === `www.${apexDomain}`) {
     return null
@@ -65,24 +74,12 @@ export function getTenantFromHost(hostname: string): string | null {
   return subdomain
 }
 
-function getTenantFromPath(pathname: string): string | null {
-  const [firstSegment] = pathname.split('/').filter(Boolean)
-
-  if (!firstSegment || RESERVED_PATH_SEGMENTS.has(firstSegment)) {
-    return null
-  }
-
-  return firstSegment
-}
-
 export async function getStoreBySlug(slug: string): Promise<Store | null> {
   const supabase = await createClient()
 
   const { data: store, error } = await supabase
     .from('stores')
-    .select(
-      'id, owner_id, name, slug, domain, logo_url, description, primary_color, secondary_color, settings, created_at, updated_at',
-    )
+    .select(STORE_SELECT_FIELDS)
     .eq('slug', slug)
     .maybeSingle()
 
@@ -93,8 +90,49 @@ export async function getStoreBySlug(slug: string): Promise<Store | null> {
   return store as Store
 }
 
-export async function getCurrentStore(request: NextRequest): Promise<Store | null> {
+export async function getStoreByCustomDomain(hostname: string): Promise<Store | null> {
+  const host = normalizeHostname(hostname)
+  const candidates = [host]
+
+  if (host.startsWith('www.')) {
+    candidates.push(host.slice(4))
+  } else {
+    candidates.push(`www.${host}`)
+  }
+
+  const supabase = await createClient()
+
+  for (const candidate of candidates) {
+    const apexCandidate = candidate.startsWith('www.') ? candidate.slice(4) : candidate
+
+    const { data: store, error } = await supabase
+      .from('stores')
+      .select(STORE_SELECT_FIELDS)
+      .eq('custom_domain', apexCandidate)
+      .eq('domain_verified', true)
+      .maybeSingle()
+
+    if (!error && store) {
+      return store as Store
+    }
+  }
+
+  return null
+}
+
+export async function resolveStoreFromRequest(
+  request: NextRequest,
+): Promise<Store | null> {
   const hostname = request.nextUrl.hostname
+
+  if (!isPlatformHostname(hostname)) {
+    const storeByDomain = await getStoreByCustomDomain(hostname)
+
+    if (storeByDomain) {
+      return storeByDomain
+    }
+  }
+
   let slug = getTenantFromHost(hostname)
 
   if (!slug && isLocalhost(hostname)) {
@@ -107,3 +145,9 @@ export async function getCurrentStore(request: NextRequest): Promise<Store | nul
 
   return getStoreBySlug(slug)
 }
+
+export async function getCurrentStore(request: NextRequest): Promise<Store | null> {
+  return resolveStoreFromRequest(request)
+}
+
+export { isPlatformHostname, isLocalhost, normalizeHostname, PLATFORM_DOMAIN }

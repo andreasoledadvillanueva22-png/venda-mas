@@ -57,8 +57,10 @@ export default function StorefrontLayout({
                 <User className="h-5 w-5" />
               </button>
               <button
+                type="button"
+                aria-label="Abrir carrito"
                 onClick={() => setIsCartOpen(true)}
-                className="relative rounded-full bg-slate-100 p-3 text-slate-900 transition hover:bg-slate-200"
+                className="relative touch-manipulation rounded-full bg-slate-100 p-3 text-slate-900 transition hover:bg-slate-200"
               >
                 <ShoppingCart className="h-5 w-5" />
                 {totalItems > 0 && (

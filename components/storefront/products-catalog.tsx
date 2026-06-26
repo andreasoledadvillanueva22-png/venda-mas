@@ -254,13 +254,9 @@ export function ProductsCatalog({ products }: ProductsCatalogProps) {
                 const imageUrl = product.images[0] ?? null
 
                 return (
-                  <Link
-                    key={product.id}
-                    href={`/storefront/product/${product.id}`}
-                    className="group"
-                  >
-                    <Card className="overflow-hidden transition-shadow hover:shadow-lg">
-                      <CardContent className="p-0">
+                  <Card key={product.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                    <CardContent className="p-0">
+                      <Link href={`/storefront/product/${product.id}`} className="group block">
                         <div className="relative aspect-square overflow-hidden bg-slate-100">
                           {imageUrl ? (
                             <img
@@ -280,39 +276,39 @@ export function ProductsCatalog({ products }: ProductsCatalogProps) {
                           )}
                         </div>
 
-                        <div className="p-4">
+                        <div className="p-4 pb-0">
                           <h3 className="mb-2 font-semibold text-foreground group-hover:text-primary">
                             {product.name}
                           </h3>
                           <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
                             {product.description}
                           </p>
-                          <div className="flex items-center justify-between">
-                            <span className="text-lg font-bold text-foreground">
-                              {formatPrice(product.price)}
-                            </span>
-                            <Button
-                              size="sm"
-                              className="bg-red-600 hover:bg-red-700"
-                              onClick={(event) => {
-                                event.preventDefault()
-                                event.stopPropagation()
-                                addToCart({
-                                  id: product.id,
-                                  name: product.name,
-                                  price: product.price,
-                                  image: imageUrl ?? '',
-                                })
-                              }}
-                            >
-                              <ShoppingCart className="mr-2 h-4 w-4" />
-                              Agregar
-                            </Button>
-                          </div>
                         </div>
-                      </CardContent>
-                    </Card>
-                  </Link>
+                      </Link>
+
+                      <div className="flex items-center justify-between p-4 pt-0">
+                        <span className="text-lg font-bold text-foreground">
+                          {formatPrice(product.price)}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          className="touch-manipulation bg-red-600 hover:bg-red-700"
+                          onClick={() =>
+                            addToCart({
+                              id: product.id,
+                              name: product.name,
+                              price: product.price,
+                              image: imageUrl ?? '',
+                            })
+                          }
+                        >
+                          <ShoppingCart className="mr-2 h-4 w-4" />
+                          Agregar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 )
               })}
             </div>

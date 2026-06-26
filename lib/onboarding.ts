@@ -82,6 +82,11 @@ export async function completeUserOnboarding(
       owner_id: user.id,
       name: storeName,
       slug,
+      free_shipping_threshold: 50000,
+      shipping_standard_cost: 14000,
+      shipping_express_cost: 8500,
+      free_shipping_enabled: true,
+      enable_local_pickup: false,
     })
     .select('id, slug')
     .single()

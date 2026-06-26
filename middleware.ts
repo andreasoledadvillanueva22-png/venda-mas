@@ -1,5 +1,6 @@
 import { updateSession } from '@/lib/supabase/proxy'
-import { getStoreBySlug, getTenantFromHost } from '@/lib/tenant'
+import { isPlatformHostname, PLATFORM_DOMAIN } from '@/lib/custom-domain'
+import { getStoreByCustomDomain, getStoreBySlug, getTenantFromHost } from '@/lib/tenant'
 import { createServerClient } from '@supabase/ssr'
 import type { CookieOptions } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
@@ -8,6 +9,13 @@ type StoredCookie = {
   name: string
   value: string
   options: CookieOptions
+}
+
+const CUSTOM_DOMAIN_STOREFRONT_REWRITES: Record<string, string> = {
+  '/': '/storefront',
+  '/products': '/storefront/products',
+  '/cart': '/storefront/cart',
+  '/checkout': '/storefront/checkout',
 }
 
 function copySupabaseCookies(from: NextResponse, to: NextResponse, storedCookies: StoredCookie[]) {
@@ -28,6 +36,48 @@ function getSafeRedirectPath(pathname: string | null): string {
   }
 
   return '/admin'
+}
+
+function getPlatformBaseUrl(request: NextRequest): string {
+  const configured = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+
+  if (configured) {
+    return configured.replace(/\/$/, '')
+  }
+
+  const vercelUrl = process.env.VERCEL_URL?.trim()
+
+  if (vercelUrl) {
+    return `https://${vercelUrl}`
+  }
+
+  return `${request.nextUrl.protocol}//${PLATFORM_DOMAIN}`
+}
+
+function rewriteCustomDomainPath(pathname: string): string | null {
+  if (pathname.startsWith('/storefront')) {
+    return null
+  }
+
+  const mappedPath = CUSTOM_DOMAIN_STOREFRONT_REWRITES[pathname]
+
+  if (mappedPath) {
+    return mappedPath
+  }
+
+  if (pathname.startsWith('/product/')) {
+    return `/storefront${pathname}`
+  }
+
+  return null
+}
+
+function applyCookies(from: NextResponse, to: NextResponse): NextResponse {
+  from.cookies.getAll().forEach((cookie) => {
+    to.cookies.set(cookie.name, cookie.value)
+  })
+
+  return to
 }
 
 async function handleProtectedAuthRoutes(request: NextRequest): Promise<NextResponse> {
@@ -89,7 +139,46 @@ async function withTenantHeader(
   request: NextRequest,
   response: NextResponse,
 ): Promise<NextResponse> {
-  const slug = getTenantFromHost(request.nextUrl.hostname)
+  const hostname = request.nextUrl.hostname
+  const pathname = request.nextUrl.pathname
+
+  if (!isPlatformHostname(hostname)) {
+    const store = await getStoreByCustomDomain(hostname)
+
+    if (store) {
+      if (pathname.startsWith('/admin') || pathname.startsWith('/auth')) {
+        const redirectUrl = new URL(pathname, getPlatformBaseUrl(request))
+        redirectUrl.search = request.nextUrl.search
+        const redirectResponse = NextResponse.redirect(redirectUrl)
+        return applyCookies(response, redirectResponse)
+      }
+
+      const requestHeaders = new Headers(request.headers)
+      requestHeaders.set('x-store-id', store.id)
+      requestHeaders.set('x-custom-domain', '1')
+
+      const rewrittenPath = rewriteCustomDomainPath(pathname)
+
+      if (rewrittenPath) {
+        const rewriteUrl = request.nextUrl.clone()
+        rewriteUrl.pathname = rewrittenPath
+
+        const rewriteResponse = NextResponse.rewrite(rewriteUrl, {
+          request: { headers: requestHeaders },
+        })
+
+        return applyCookies(response, rewriteResponse)
+      }
+
+      const nextResponse = NextResponse.next({
+        request: { headers: requestHeaders },
+      })
+
+      return applyCookies(response, nextResponse)
+    }
+  }
+
+  const slug = getTenantFromHost(hostname)
 
   if (!slug) {
     return response
@@ -108,11 +197,7 @@ async function withTenantHeader(
     request: { headers: requestHeaders },
   })
 
-  response.cookies.getAll().forEach((cookie) => {
-    nextResponse.cookies.set(cookie.name, cookie.value)
-  })
-
-  return nextResponse
+  return applyCookies(response, nextResponse)
 }
 
 export async function middleware(request: NextRequest) {

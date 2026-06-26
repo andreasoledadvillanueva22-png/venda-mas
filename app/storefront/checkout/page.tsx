@@ -353,7 +353,7 @@ function resolveFreeShippingFromProducts(
   return dbProductNames.some((name) => hasFreeShippingByName(name))
 }
 
-type AuthenticatedStore = {
+type CheckoutStore = {
   id: string
   name: string
   shippingConfig: ShippingConfig
@@ -361,30 +361,26 @@ type AuthenticatedStore = {
   bankDetails: BankDetailsConfig
 }
 
-async function getAuthenticatedStore(
-  supabase: ReturnType<typeof createClient>,
-): Promise<AuthenticatedStore | null> {
-  const {
-    data: { user },
-    error: authError,
-  } = await supabase.auth.getUser()
+const STORE_SELECT_FIELDS =
+  'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit'
 
-  if (authError || !user) {
-    return null
-  }
-
-  const { data: store, error: storeError } = await supabase
-    .from('stores')
-    .select(
-      'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit',
-    )
-    .eq('owner_id', user.id)
-    .maybeSingle()
-
-  if (storeError || !store) {
-    return null
-  }
-
+function mapCheckoutStore(store: {
+  id: string
+  name: string
+  free_shipping_threshold: number | null
+  shipping_standard_cost: number | null
+  shipping_express_cost: number | null
+  free_shipping_enabled: boolean | null
+  enable_local_pickup: boolean | null
+  pickup_address: string | null
+  pickup_instructions: string | null
+  pickup_schedule: string | null
+  bank_name: string | null
+  cbu: string | null
+  alias: string | null
+  account_holder: string | null
+  cuit: string | null
+}): CheckoutStore {
   return {
     id: store.id,
     name: store.name,
@@ -417,13 +413,84 @@ async function getAuthenticatedStore(
   }
 }
 
+async function resolveCheckoutStore(
+  supabase: ReturnType<typeof createClient>,
+  storeSlug: string | null,
+  productIds: string[],
+): Promise<CheckoutStore | null> {
+  if (storeSlug) {
+    const { data: store, error: storeError } = await supabase
+      .from('stores')
+      .select(STORE_SELECT_FIELDS)
+      .eq('slug', storeSlug)
+      .maybeSingle()
+
+    if (!storeError && store) {
+      return mapCheckoutStore(store)
+    }
+  }
+
+  if (productIds.length > 0) {
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('store_id')
+      .in('id', productIds)
+      .eq('active', true)
+
+    if (productsError || !products || products.length === 0) {
+      return null
+    }
+
+    const storeIds = [...new Set(products.map((product: { store_id: string }) => product.store_id))]
+
+    if (storeIds.length !== 1) {
+      return null
+    }
+
+    const { data: store, error: storeError } = await supabase
+      .from('stores')
+      .select(STORE_SELECT_FIELDS)
+      .eq('id', storeIds[0])
+      .maybeSingle()
+
+    if (!storeError && store) {
+      return mapCheckoutStore(store)
+    }
+  }
+
+  return null
+}
+
+async function prefillCustomerFromSession(
+  supabase: ReturnType<typeof createClient>,
+): Promise<Partial<CheckoutFormData>> {
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return {}
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name, email')
+    .eq('id', user.id)
+    .maybeSingle()
+
+  return {
+    email: profile?.email ?? user.email ?? '',
+    nombre: profile?.full_name ?? '',
+  }
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const { items, subtotal, clearCart } = useCart()
 
-  const [authLoading, setAuthLoading] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [storeLoading, setStoreLoading] = useState(true)
   const [storeId, setStoreId] = useState<string | null>(null)
   const [storeName, setStoreName] = useState<string | null>(null)
   const [shippingConfig, setShippingConfig] = useState<ShippingConfig>(DEFAULT_SHIPPING_CONFIG)
@@ -457,22 +524,36 @@ export default function CheckoutPage() {
   const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    async function loadAuthenticatedStore() {
-      setAuthLoading(true)
-      const store = await getAuthenticatedStore(supabase)
+    async function loadCheckoutStore() {
+      setStoreLoading(true)
+
+      const storeSlug = new URLSearchParams(window.location.search).get('store')
+      const productIds = items.map((item) => item.id)
+      const store = await resolveCheckoutStore(supabase, storeSlug, productIds)
+      const customerPrefill = await prefillCustomerFromSession(supabase)
+
       setStoreId(store?.id ?? null)
       setStoreName(store?.name ?? null)
+
       if (store) {
         setShippingConfig(store.shippingConfig)
         setLocalPickupConfig(store.localPickupConfig)
         setBankDetails(store.bankDetails)
       }
-      setIsAuthenticated(Boolean(store))
-      setAuthLoading(false)
+
+      if (customerPrefill.email || customerPrefill.nombre) {
+        setFormData((prev) => ({
+          ...prev,
+          email: customerPrefill.email || prev.email,
+          nombre: customerPrefill.nombre || prev.nombre,
+        }))
+      }
+
+      setStoreLoading(false)
     }
 
-    void loadAuthenticatedStore()
-  }, [supabase])
+    void loadCheckoutStore()
+  }, [supabase, items])
 
   useEffect(() => {
     async function loadProductFreeShipping() {
@@ -580,13 +661,13 @@ export default function CheckoutPage() {
 
   const total = subtotal + shippingCost
 
-  if (authLoading) {
+  if (storeLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 py-12">
             <Loader2 className="h-8 w-8 animate-spin text-red-600" />
-            <p className="text-sm text-slate-500">Verificando sesión...</p>
+            <p className="text-sm text-slate-500">Cargando checkout...</p>
           </CardContent>
         </Card>
       </div>
@@ -613,20 +694,30 @@ export default function CheckoutPage() {
     )
   }
 
-  if (!isAuthenticated || !storeId) {
+  if (!storeId) {
+    const storeSlug = typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('store')
+      : null
+
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
         <Card className="w-full max-w-md">
           <CardContent className="flex flex-col items-center gap-4 py-12">
             <p className="text-lg font-semibold text-slate-900">
-              Iniciá sesión para completar la compra
+              No pudimos identificar la tienda
             </p>
             <p className="text-center text-sm text-slate-500">
-              Necesitás una cuenta activa con tienda para registrar tu pedido.
+              Volvé al catálogo, agregá productos al carrito e intentá nuevamente.
             </p>
-            <Link href="/auth/login?redirect=/storefront/checkout">
+            <Link
+              href={
+                storeSlug
+                  ? `/storefront/products?store=${encodeURIComponent(storeSlug)}`
+                  : '/storefront/products'
+              }
+            >
               <Button className="mt-2 bg-red-600 text-white hover:bg-red-700">
-                Iniciar sesión
+                Ir al catálogo
               </Button>
             </Link>
             <Link
@@ -676,84 +767,46 @@ export default function CheckoutPage() {
   }
 
   const createOrder = async (): Promise<{ orderId: string } | { error: string }> => {
-    const productIds = items.map((item) => item.id)
-
-    const { data: products, error: productsError } = await supabase
-      .from('products')
-      .select('id, name')
-      .in('id', productIds)
-      .eq('store_id', storeId)
-      .eq('active', true)
-
-    if (productsError || !products || products.length !== productIds.length) {
-      return { error: 'Algunos productos del carrito ya no están disponibles.' }
+    if (!storeId) {
+      return { error: 'No se pudo identificar la tienda.' }
     }
 
-    const orderHasFreeShipping = resolveFreeShippingFromProducts(
-      items,
-      products.map((product: { name: string }) => product.name),
-    )
-
-    const orderSubtotal = items.reduce(
-      (sum, item) => sum + item.price * item.quantity,
-      0,
-    )
-    const orderShippingCost = calculateShippingCost(
-      orderSubtotal,
-      orderHasFreeShipping,
-      shippingMethod,
-      shippingConfig,
-    )
-    const orderTotal = orderSubtotal + orderShippingCost
-    const orderShippingMethod = resolveShippingMethod(
-      orderSubtotal,
-      orderHasFreeShipping,
-      shippingMethod,
-      shippingConfig,
-    )
     const customerAddress = isLocalPickup
       ? buildPickupCustomerAddress(localPickupConfig)
       : buildCustomerAddress(formData)
 
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        store_id: storeId,
-        customer_name: formData.nombre.trim(),
-        customer_email: formData.email.trim(),
-        customer_phone: formData.phone.trim(),
-        customer_address: customerAddress,
-        status: 'pending',
-        payment_status: 'pending',
-        payment_method: paymentMethod as 'mercadopago' | 'bank_transfer' | 'effectivo',
-        shipping_method: orderShippingMethod,
-        shipping_cost: orderShippingCost,
-        subtotal: orderSubtotal,
-        total: orderTotal,
-        discount_amount: 0,
-      })
-      .select('id')
-      .single()
+    const response = await fetch('/api/storefront/checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        storeId,
+        items: items.map((item) => ({
+          id: item.id,
+          name: item.name,
+          price: item.price,
+          quantity: item.quantity,
+        })),
+        customer: {
+          name: formData.nombre.trim(),
+          email: formData.email.trim(),
+          phone: formData.phone.trim(),
+          address: customerAddress,
+        },
+        shippingMethod,
+        paymentMethod,
+        shippingConfig,
+      }),
+    })
 
-    if (orderError || !order) {
-      return { error: orderError?.message ?? 'No se pudo crear el pedido.' }
+    const payload = (await response.json()) as { orderId?: string; error?: string }
+
+    if (!response.ok || !payload.orderId) {
+      return { error: payload.error ?? 'No se pudo crear el pedido.' }
     }
 
-    const orderItems = items.map((item) => ({
-      order_id: order.id,
-      product_id: item.id,
-      quantity: item.quantity,
-      unit_price: item.price,
-      total: item.price * item.quantity,
-    }))
-
-    const { error: itemsError } = await supabase.from('order_items').insert(orderItems)
-
-    if (itemsError) {
-      return { error: itemsError.message }
-    }
-
-    return { orderId: order.id }
+    return { orderId: payload.orderId }
   }
 
   const startMercadoPagoPayment = async (
@@ -892,6 +945,15 @@ export default function CheckoutPage() {
                   <Mail className="h-5 w-5 text-red-600" />
                   Datos de contacto
                 </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Comprá sin crear cuenta.{' '}
+                  <Link
+                    href={`/auth/login?redirect=${encodeURIComponent('/storefront/checkout')}`}
+                    className="font-medium text-red-600 hover:text-red-700"
+                  >
+                    ¿Ya tenés cuenta? Iniciá sesión
+                  </Link>
+                </p>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>

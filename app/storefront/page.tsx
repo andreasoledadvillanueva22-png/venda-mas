@@ -397,7 +397,7 @@ function RecentPurchaseNotifications({
         {notifications.map((purchase, index) => (
           <div
             key={`${purchase.customer}-${purchase.productName}-${index}`}
-            className="recent-purchase-notification absolute inset-x-0 bottom-0 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
+            className="recent-purchase-notification pointer-events-none absolute inset-x-0 bottom-0 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
             style={{ animationDelay: `${index * POPUP_ROTATION_SECONDS}s` }}
           >
             <div className="flex items-start gap-3">

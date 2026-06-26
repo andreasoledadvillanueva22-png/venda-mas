@@ -36,10 +36,11 @@ export function AddToCartButton({
 
   return (
     <Button
+      type="button"
       onClick={handleAddToCart}
       disabled={stock === 0}
       size="lg"
-      className={`w-full bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`w-full touch-manipulation bg-red-600 hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50 ${className}`}
     >
       <ShoppingCart className="mr-2 h-5 w-5" />
       {stock > 0 ? 'Agregar al carrito' : 'Agotado'}

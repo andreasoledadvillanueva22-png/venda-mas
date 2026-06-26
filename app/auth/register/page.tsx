@@ -4,49 +4,13 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Mail, Lock, User, Store, Eye, EyeOff, Loader2, Check } from 'lucide-react'
 import type { SupabaseClient, User as AuthUser } from '@supabase/supabase-js'
+import { completeOnboardingRequest } from '@/lib/onboarding-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase'
 import Link from 'next/link'
-
-function slugify(text: string): string {
-  const slug = text
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 50)
-
-  return slug || 'tienda'
-}
-
-async function isSlugTaken(supabase: SupabaseClient, slug: string): Promise<boolean> {
-  const [{ data: store }, { data: profile }] = await Promise.all([
-    supabase.from('stores').select('id').eq('slug', slug).maybeSingle(),
-    supabase.from('profiles').select('id').eq('store_slug', slug).maybeSingle(),
-  ])
-
-  return Boolean(store || profile)
-}
-
-async function generateUniqueStoreSlug(
-  supabase: SupabaseClient,
-  storeName: string,
-): Promise<string> {
-  const base = slugify(storeName)
-  let slug = base
-  let counter = 0
-
-  while (await isSlugTaken(supabase, slug)) {
-    counter += 1
-    slug = `${base}-${counter}`
-  }
-
-  return slug
-}
 
 function mapAuthError(message: string): string {
   if (message.includes('already registered') || message.includes('already been registered')) {
@@ -149,32 +113,14 @@ export default function RegisterPage() {
     return true
   }
 
-  const createProfileAndStore = async (userId: string, userEmail: string) => {
-    const trimmedFullName = fullName.trim()
-    const trimmedStoreName = storeName.trim()
-    const storeSlug = await generateUniqueStoreSlug(supabase, trimmedStoreName)
-
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: userId,
-      email: userEmail,
-      full_name: trimmedFullName,
-      store_name: trimmedStoreName,
-      store_slug: storeSlug,
-      role: 'owner',
+  const completeOnboarding = async () => {
+    const payload = await completeOnboardingRequest({
+      fullName: fullName.trim(),
+      storeName: storeName.trim(),
     })
 
-    if (profileError) {
-      throw new Error(profileError.message)
-    }
-
-    const { error: storeError } = await supabase.from('stores').insert({
-      owner_id: userId,
-      name: trimmedStoreName,
-      slug: storeSlug,
-    })
-
-    if (storeError) {
-      throw new Error(storeError.message)
+    if (!payload.success) {
+      throw new Error(payload.error ?? 'No se pudo crear la tienda')
     }
   }
 
@@ -225,9 +171,7 @@ export default function RegisterPage() {
         return
       }
 
-      const userEmail = authResult.user.email ?? trimmedEmail
-
-      await createProfileAndStore(authResult.user.id, userEmail)
+      await completeOnboarding()
 
       setSuccess(true)
       router.refresh()

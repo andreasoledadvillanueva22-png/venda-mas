@@ -10,6 +10,7 @@ import {
 import { createClient, getUser } from '@/lib/supabase/server'
 import { getStoreBySlug } from '@/lib/tenant'
 import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
+import { BuyNowButton } from '@/components/storefront/buy-now-button'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -366,15 +367,14 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
                 productImage={mainImage ?? ''}
                 stock={product.stock}
               />
-              <Link
-                href="/storefront/checkout"
-                className={cn(
-                  buttonVariants({ variant: 'outline', size: 'lg' }),
-                  'w-full justify-center',
-                )}
-              >
-                Comprar ahora
-              </Link>
+              <BuyNowButton
+                productId={product.id}
+                productName={product.name}
+                productPrice={price}
+                productImage={mainImage ?? ''}
+                stock={product.stock}
+                storeSlug={query.store ?? null}
+              />
             </div>
 
             <div className="space-y-3 rounded-xl border border-border p-4">

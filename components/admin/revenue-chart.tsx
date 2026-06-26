@@ -1,6 +1,7 @@
 'use client'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { DashboardRevenuePoint } from '@/lib/admin-dashboard'
 import {
   LineChart,
   Line,
@@ -11,44 +12,10 @@ import {
   ResponsiveContainer,
 } from 'recharts'
 
-// Static data to avoid hydration mismatch
-const data = [
-  { name: 'May 5', revenue: 2100 },
-  { name: 'May 6', revenue: 1850 },
-  { name: 'May 7', revenue: 2400 },
-  { name: 'May 8', revenue: 1950 },
-  { name: 'May 9', revenue: 3200 },
-  { name: 'May 10', revenue: 2800 },
-  { name: 'May 11', revenue: 2150 },
-  { name: 'May 12', revenue: 1780 },
-  { name: 'May 13', revenue: 2650 },
-  { name: 'May 14', revenue: 3100 },
-  { name: 'May 15', revenue: 2450 },
-  { name: 'May 16', revenue: 2900 },
-  { name: 'May 17', revenue: 3400 },
-  { name: 'May 18', revenue: 2200 },
-  { name: 'May 19', revenue: 1950 },
-  { name: 'May 20', revenue: 2750 },
-  { name: 'May 21', revenue: 3050 },
-  { name: 'May 22', revenue: 2680 },
-  { name: 'May 23', revenue: 3200 },
-  { name: 'May 24', revenue: 3850 },
-  { name: 'May 25', revenue: 4100 },
-  { name: 'May 26', revenue: 3650 },
-  { name: 'May 27', revenue: 2950 },
-  { name: 'May 28', revenue: 3400 },
-  { name: 'May 29', revenue: 3100 },
-  { name: 'May 30', revenue: 2850 },
-  { name: 'May 31', revenue: 3250 },
-  { name: 'Jun 1', revenue: 3600 },
-  { name: 'Jun 2', revenue: 3950 },
-  { name: 'Jun 3', revenue: 4200 },
-]
-
 const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('en-US', {
+  return new Intl.NumberFormat('es-AR', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'ARS',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   }).format(value)
@@ -56,14 +23,15 @@ const formatCurrency = (value: number) => {
 
 interface RevenueChartProps {
   className?: string
+  data: DashboardRevenuePoint[]
 }
 
-export function RevenueChart({ className }: RevenueChartProps) {
+export function RevenueChart({ className, data }: RevenueChartProps) {
   return (
     <Card className={className}>
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-semibold">Revenue</CardTitle>
-        <p className="text-sm text-muted-foreground">Last 30 days</p>
+        <CardTitle className="text-base font-semibold">Ingresos</CardTitle>
+        <p className="text-sm text-muted-foreground">Últimos 30 días</p>
       </CardHeader>
       <CardContent className="pt-0">
         <div className="h-[300px] w-full min-h-[200px]">
@@ -82,7 +50,7 @@ export function RevenueChart({ className }: RevenueChartProps) {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: 'oklch(0.45 0.02 250)', fontSize: 11 }}
-                tickFormatter={(value) => `$${value / 1000}k`}
+                tickFormatter={(value) => `$${Math.round(Number(value) / 1000)}k`}
                 dx={-10}
               />
               <Tooltip
@@ -94,7 +62,7 @@ export function RevenueChart({ className }: RevenueChartProps) {
                 }}
                 formatter={(value) => [
                   formatCurrency(typeof value === 'number' ? value : Number(value ?? 0)),
-                  'Revenue',
+                  'Ingresos',
                 ]}
                 labelStyle={{ color: 'oklch(0.13 0.02 250)', fontWeight: 600 }}
               />

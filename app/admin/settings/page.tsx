@@ -5,6 +5,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/server'
+import {
+  generateDomainVerificationToken,
+  getDomainTxtHost,
+  getDomainTxtValue,
+  isReservedPlatformDomain,
+  normalizeCustomDomain,
+  VERCEL_APEX_IP,
+  VERCEL_CNAME_TARGET,
+} from '@/lib/custom-domain'
+import {
+  registerDomainWithVercel,
+  removeDomainFromVercel,
+  verifyDomainDns,
+} from '@/lib/domain-verification'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -40,6 +54,9 @@ type DbStore = {
   alias: string | null
   account_holder: string | null
   cuit: string | null
+  custom_domain: string | null
+  domain_verified: boolean | null
+  domain_verification_token: string | null
 }
 
 type SettingsData = {
@@ -62,6 +79,10 @@ type SettingsPageProps = {
     pickup_error?: string
     bank_saved?: string
     bank_error?: string
+    domain_saved?: string
+    domain_verified_msg?: string
+    domain_removed?: string
+    domain_error?: string
     hero_saved?: string
     hero_error?: string
   }>
@@ -152,7 +173,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit',
+      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, custom_domain, domain_verified, domain_verification_token',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -691,6 +712,243 @@ export async function saveBankDetails(formData: FormData): Promise<void> {
   redirect('/admin/settings?bank_saved=1')
 }
 
+export async function addCustomDomain(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const customDomainInput = formData.get('customDomain')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  if (typeof customDomainInput !== 'string' || !customDomainInput.trim()) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('Ingresá un dominio válido.')}`,
+    )
+  }
+
+  const normalizedDomain = normalizeCustomDomain(customDomainInput)
+
+  if (!normalizedDomain) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('El dominio ingresado no es válido.')}`,
+    )
+  }
+
+  if (isReservedPlatformDomain(normalizedDomain)) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No podés usar un dominio reservado de la plataforma.')}`,
+    )
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { data: existingDomainStore, error: existingDomainError } = await supabase
+    .from('stores')
+    .select('id')
+    .eq('custom_domain', normalizedDomain)
+    .neq('id', storeId)
+    .maybeSingle()
+
+  if (existingDomainError) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No se pudo validar la disponibilidad del dominio.')}`,
+    )
+  }
+
+  if (existingDomainStore) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('Ese dominio ya está en uso por otra tienda.')}`,
+    )
+  }
+
+  const verificationToken = generateDomainVerificationToken()
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      custom_domain: normalizedDomain,
+      domain_verified: false,
+      domain_verification_token: verificationToken,
+      domain: normalizedDomain,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No se pudo guardar el dominio.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  redirect('/admin/settings?domain_saved=1')
+}
+
+export async function verifyCustomDomain(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id, custom_domain, domain_verification_token')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  if (!store.custom_domain?.trim() || !store.domain_verification_token?.trim()) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('Primero agregá un dominio personalizado.')}`,
+    )
+  }
+
+  const verification = await verifyDomainDns(
+    store.custom_domain,
+    store.domain_verification_token,
+  )
+
+  if (!verification.verified) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent(verification.message)}`,
+    )
+  }
+
+  const vercelResult = await registerDomainWithVercel(store.custom_domain)
+
+  if ('error' in vercelResult) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent(vercelResult.error)}`,
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      domain_verified: true,
+      domain: store.custom_domain,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('El dominio se verificó pero no se pudo guardar el estado.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  redirect(`/admin/settings?domain_verified_msg=${encodeURIComponent(verification.message)}`)
+}
+
+export async function removeCustomDomain(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id, custom_domain')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  if (store.custom_domain?.trim()) {
+    await removeDomainFromVercel(store.custom_domain)
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      custom_domain: null,
+      domain_verified: false,
+      domain_verification_token: null,
+      domain: null,
+    })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?domain_error=${encodeURIComponent('No se pudo eliminar el dominio.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  redirect('/admin/settings?domain_removed=1')
+}
+
 export default async function AdminSettingsPage({ searchParams }: SettingsPageProps) {
   const {
     saved,
@@ -705,6 +963,10 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     pickup_error,
     bank_saved,
     bank_error,
+    domain_saved,
+    domain_verified_msg,
+    domain_removed,
+    domain_error,
     hero_saved,
     hero_error,
   } = await searchParams
@@ -727,6 +989,14 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
   )
   const shippingExpressCost = Number(store.shipping_express_cost ?? DEFAULT_SHIPPING_EXPRESS_COST)
   const enableLocalPickup = store.enable_local_pickup ?? false
+  const customDomain = store.custom_domain
+  const domainVerified = store.domain_verified ?? false
+  const domainVerificationToken = store.domain_verification_token
+  const domainTxtHost = customDomain ? getDomainTxtHost(customDomain) : null
+  const domainTxtValue = domainVerificationToken
+    ? getDomainTxtValue(domainVerificationToken)
+    : null
+  const platformStorefrontUrl = `https://${process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'venda-mas.vercel.app'}/storefront?store=${encodeURIComponent(store.slug)}`
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -803,6 +1073,30 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {bank_error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {bank_error}
+          </div>
+        ) : null}
+
+        {domain_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Dominio guardado. Configurá el DNS y luego hacé clic en &quot;Verificar dominio&quot;.
+          </div>
+        ) : null}
+
+        {domain_verified_msg ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {domain_verified_msg}
+          </div>
+        ) : null}
+
+        {domain_removed === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Dominio personalizado eliminado
+          </div>
+        ) : null}
+
+        {domain_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {domain_error}
           </div>
         ) : null}
 
@@ -986,6 +1280,131 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
             </Button>
           </div>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Dominio personalizado</CardTitle>
+            <CardDescription>
+              Conectá tu propio dominio para que tus clientes visiten tu tienda con una URL profesional.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="rounded-lg border border-border bg-slate-50 p-4 text-sm text-slate-700">
+              <p className="font-medium text-slate-900">URL actual de tu tienda</p>
+              <p className="mt-1 break-all font-mono text-xs">{platformStorefrontUrl}</p>
+            </div>
+
+            {customDomain ? (
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-center gap-3">
+                  <p className="text-sm font-medium text-foreground">{customDomain}</p>
+                  {domainVerified ? (
+                    <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      Verificado
+                    </span>
+                  ) : (
+                    <span className="rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                      Pendiente de verificación
+                    </span>
+                  )}
+                </div>
+
+                {!domainVerified && domainTxtHost && domainTxtValue ? (
+                  <div className="space-y-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+                    <p className="font-semibold">Configurá estos registros DNS en tu proveedor de dominio</p>
+
+                    <div className="space-y-3">
+                      <div>
+                        <p className="font-medium">1. Verificación (TXT)</p>
+                        <p className="mt-1 text-xs text-amber-900">
+                          Host / Nombre: <span className="font-mono">{domainTxtHost}</span>
+                        </p>
+                        <p className="text-xs text-amber-900">
+                          Valor: <span className="font-mono break-all">{domainTxtValue}</span>
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-medium">2. Tráfico web (CNAME para www)</p>
+                        <p className="mt-1 text-xs text-amber-900">
+                          Host: <span className="font-mono">www.{customDomain}</span>
+                        </p>
+                        <p className="text-xs text-amber-900">
+                          Apunta a: <span className="font-mono">{VERCEL_CNAME_TARGET}</span>
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="font-medium">3. Dominio raíz (A record)</p>
+                        <p className="mt-1 text-xs text-amber-900">
+                          Host: <span className="font-mono">@</span>
+                        </p>
+                        <p className="text-xs text-amber-900">
+                          Apunta a: <span className="font-mono">{VERCEL_APEX_IP}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-amber-900">
+                      La propagación DNS puede tardar entre 5 minutos y 48 horas. Vercel emitirá el
+                      certificado SSL automáticamente una vez verificado el dominio.
+                    </p>
+                  </div>
+                ) : null}
+
+                {domainVerified ? (
+                  <p className="text-sm text-muted-foreground">
+                    Tu tienda está disponible en{' '}
+                    <a
+                      href={`https://${customDomain}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-medium text-red-600 hover:text-red-700"
+                    >
+                      https://{customDomain}
+                    </a>
+                  </p>
+                ) : (
+                  <form action={verifyCustomDomain}>
+                    <input type="hidden" name="storeId" value={store.id} />
+                    <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                      Verificar dominio
+                    </Button>
+                  </form>
+                )}
+
+                <form action={removeCustomDomain}>
+                  <input type="hidden" name="storeId" value={store.id} />
+                  <Button type="submit" variant="outline">
+                    Eliminar dominio
+                  </Button>
+                </form>
+              </div>
+            ) : (
+              <form action={addCustomDomain} className="space-y-4">
+                <input type="hidden" name="storeId" value={store.id} />
+
+                <div className="space-y-2">
+                  <Label htmlFor="customDomain">Tu dominio</Label>
+                  <Input
+                    id="customDomain"
+                    name="customDomain"
+                    placeholder="andreatiendaonline.com"
+                    autoComplete="off"
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Ingresá solo el dominio, sin https:// ni www.
+                  </p>
+                </div>
+
+                <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                  Agregar dominio
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
