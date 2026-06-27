@@ -19,7 +19,7 @@ import {
   resolveStorefrontStore,
 } from '@/lib/storefront-server'
 import type { StorefrontTestimonial } from '@/lib/storefront'
-import { storefrontHref } from '@/lib/storefront'
+import { buildWhatsappUrl, storefrontHref } from '@/lib/storefront'
 
 const BRAND_RED = '#FC0303'
 
@@ -32,21 +32,11 @@ const CATEGORY_COLORS = [
   'from-cyan-500 to-cyan-700',
 ]
 
-const samplePurchaseProfiles = [
-  { customer: 'María', city: 'Córdoba' },
-  { customer: 'Ana', city: 'La Plata' },
-  { customer: 'Pedro', city: 'Tucumán' },
-  { customer: 'Juan', city: 'Rosario' },
-  { customer: 'Sofía', city: 'Mar del Plata' },
-]
-
 const POPUP_PRODUCT_LIMIT = 5
 const POPUP_ROTATION_SECONDS = 20
 const POPUP_VISIBLE_SECONDS = 5
 
 type RecentPurchaseNotification = {
-  customer: string
-  city: string
   productName: string
   minutes: number
 }
@@ -174,16 +164,10 @@ function buildRecentPurchaseNotifications(
     return []
   }
 
-  return products.map((product, index) => {
-    const profile = samplePurchaseProfiles[index % samplePurchaseProfiles.length]
-
-    return {
-      customer: profile.customer,
-      city: profile.city,
-      productName: product.name,
-      minutes: getRandomPurchaseMinutes(),
-    }
-  })
+  return products.map((product) => ({
+    productName: product.name,
+    minutes: getRandomPurchaseMinutes(),
+  }))
 }
 
 async function getPromoProducts(storeId: string): Promise<CatalogProduct[]> {
@@ -318,15 +302,14 @@ function RecentPurchaseNotifications({
       <div className="pointer-events-none fixed bottom-6 left-4 z-50 h-28 w-[min(calc(100vw-2rem),20rem)] sm:left-6">
         {notifications.map((purchase, index) => (
           <div
-            key={`${purchase.customer}-${purchase.productName}-${index}`}
+            key={`${purchase.productName}-${index}`}
             className="recent-purchase-notification pointer-events-none absolute inset-x-0 bottom-0 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
             style={{ animationDelay: `${index * POPUP_ROTATION_SECONDS}s` }}
           >
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
               <p className="text-sm leading-snug text-slate-700">
-                <span className="font-semibold text-slate-900">{purchase.customer}</span> de{' '}
-                <span className="font-semibold text-slate-900">{purchase.city}</span> compró{' '}
+                Alguien compró{' '}
                 <span className="font-semibold text-slate-900">{purchase.productName}</span> hace{' '}
                 {purchase.minutes} minutos
               </p>
@@ -408,14 +391,16 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                   Ver productos
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Link>
-                <a
-                  href="https://wa.me/5493743417659"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-8 py-3 text-lg font-medium text-slate-900 transition hover:bg-slate-50"
-                >
-                  Contactar por WhatsApp
-                </a>
+                {store.footerWhatsapp ? (
+                  <a
+                    href={buildWhatsappUrl(store.footerWhatsapp)}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center rounded-md border border-slate-300 bg-white px-8 py-3 text-lg font-medium text-slate-900 transition hover:bg-slate-50"
+                  >
+                    Contactar por WhatsApp
+                  </a>
+                ) : null}
               </div>
             </div>
             <HeroVisual storeName={storeName} heroImageUrl={heroImageUrl} />

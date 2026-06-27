@@ -2,6 +2,7 @@ import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getStoreBySlug } from '@/lib/tenant'
 import type { StorefrontStore, StorefrontTestimonial } from '@/lib/storefront'
+import { isLikelyDirectImageUrl } from '@/lib/storefront'
 
 const STOREFRONT_STORE_SELECT =
   'id, name, slug, logo_url, hero_image_url, description, free_shipping_threshold, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook'
@@ -14,6 +15,14 @@ function normalizeOptionalText(value: string | null | undefined): string | null 
 function normalizeOptionalUrl(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
   return trimmed ? trimmed : null
+}
+
+function normalizeHeroImageUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed) {
+    return null
+  }
+  return isLikelyDirectImageUrl(trimmed) ? trimmed : null
 }
 
 function mapStoreRow(store: {
@@ -36,7 +45,7 @@ function mapStoreRow(store: {
     name: store.name,
     slug: store.slug,
     logoUrl: normalizeOptionalUrl(store.logo_url),
-    heroImageUrl: normalizeOptionalUrl(store.hero_image_url),
+    heroImageUrl: normalizeHeroImageUrl(store.hero_image_url),
     description: normalizeOptionalText(store.description),
     freeShippingThreshold: Number(store.free_shipping_threshold ?? 50000),
     footerEmail: normalizeOptionalText(store.footer_email),

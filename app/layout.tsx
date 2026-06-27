@@ -7,8 +7,8 @@ import { CartDrawer } from '@/components/storefront/cart-drawer'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'Andrea Tienda Online',
-  description: 'Productos de calidad con envío a toda Argentina',
+  title: 'VendaMás',
+  description: 'Plataforma de tiendas online con envío a toda Argentina',
 }
 
 export default function RootLayout({

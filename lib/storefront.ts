@@ -43,6 +43,30 @@ export function buildWhatsappUrl(phone: string): string {
   return digits ? `https://wa.me/${digits}` : '#'
 }
 
+export function isLikelyDirectImageUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url)
+    if (/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?.*)?$/i.test(parsed.pathname)) {
+      return true
+    }
+    if (parsed.hostname.includes('supabase.co') && parsed.pathname.includes('/storage/')) {
+      return true
+    }
+    if (parsed.hostname === 'i.ibb.co') {
+      return true
+    }
+    if (parsed.hostname.includes('cloudinary.com')) {
+      return true
+    }
+    if (parsed.hostname.includes('images.unsplash.com')) {
+      return true
+    }
+    return false
+  } catch {
+    return false
+  }
+}
+
 export function normalizeSocialUrl(value: string, fallbackPrefix: string): string {
   const trimmed = value.trim()
   if (!trimmed) return '#'
