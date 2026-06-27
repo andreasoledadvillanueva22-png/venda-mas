@@ -15,8 +15,10 @@ import { Card, CardContent } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/server'
 import {
   getStoreCategories,
+  getStoreTestimonials,
   resolveStorefrontStore,
 } from '@/lib/storefront-server'
+import type { StorefrontTestimonial } from '@/lib/storefront'
 import { storefrontHref } from '@/lib/storefront'
 
 const BRAND_RED = '#FC0303'
@@ -28,27 +30,6 @@ const CATEGORY_COLORS = [
   'from-pink-500 to-pink-700',
   'from-amber-500 to-amber-700',
   'from-cyan-500 to-cyan-700',
-]
-
-const testimonials = [
-  {
-    name: 'María González',
-    city: 'Buenos Aires',
-    comment:
-      'Excelente atención y los productos llegaron en perfecto estado. Super recomendable para comprar online.',
-  },
-  {
-    name: 'Carlos Ruiz',
-    city: 'Rosario',
-    comment:
-      'Compré suplementos y el envío fue rapidísimo. Muy buena experiencia de compra, volveré a pedir.',
-  },
-  {
-    name: 'Lucía Fernández',
-    city: 'Mendoza',
-    comment:
-      'Precios accesibles y pago con Mercado Pago sin problemas. La calidad superó mis expectativas.',
-  },
 ]
 
 const samplePurchaseProfiles = [
@@ -280,11 +261,20 @@ function HeroVisual({
   )
 }
 
-function StarRating() {
+function StarRating({ rating = 5 }: { rating?: number }) {
+  const safeRating = Math.min(5, Math.max(1, rating))
+
   return (
-    <div className="flex gap-0.5" aria-label="5 estrellas">
+    <div className="flex gap-0.5" aria-label={`${safeRating} estrellas`}>
       {Array.from({ length: 5 }).map((_, index) => (
-        <Star key={index} className="h-4 w-4 fill-amber-400 text-amber-400" />
+        <Star
+          key={index}
+          className={`h-4 w-4 ${
+            index < safeRating
+              ? 'fill-amber-400 text-amber-400'
+              : 'fill-slate-200 text-slate-200'
+          }`}
+        />
       ))}
     </div>
   )
@@ -368,6 +358,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
   const storeName = store.name
   const heroImageUrl = store.heroImageUrl
   const storeCategories = await getStoreCategories(store.id)
+  const testimonials = await getStoreTestimonials(store.id)
   const featuredProducts = await getHomepageProducts(store.id)
   const promoProducts = await getPromoProducts(store.id)
   const popupProducts = await getPopupProducts(store.id)
@@ -637,38 +628,45 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       ) : null}
 
       {/* TESTIMONIOS */}
-      <section className="bg-slate-50 py-16 sm:py-20">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
-              OPINIONES
-            </p>
-            <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
-              Lo que dicen nuestros clientes
-            </h2>
-          </div>
+      {testimonials.length > 0 ? (
+        <section className="bg-slate-50 py-16 sm:py-20">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div className="text-center">
+              <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+                OPINIONES
+              </p>
+              <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
+                Lo que dicen nuestros clientes
+              </h2>
+            </div>
 
-          <div className="mt-12 grid gap-6 md:grid-cols-3">
-            {testimonials.map((testimonial) => (
-              <Card
-                key={testimonial.name}
-                className="rounded-2xl border border-slate-100 bg-white shadow-md"
-              >
-                <CardContent className="space-y-4 p-6">
-                  <StarRating />
-                  <p className="text-sm leading-relaxed text-slate-600">
-                    &ldquo;{testimonial.comment}&rdquo;
-                  </p>
-                  <div>
-                    <p className="font-semibold text-slate-900">{testimonial.name}</p>
-                    <p className="text-sm text-slate-500">{testimonial.city}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+            <div className="mt-12 grid gap-6 md:grid-cols-3">
+              {testimonials.map((testimonial: StorefrontTestimonial) => (
+                <Card
+                  key={testimonial.id}
+                  className="rounded-2xl border border-slate-100 bg-white shadow-md"
+                >
+                  <CardContent className="space-y-4 p-6">
+                    <StarRating rating={testimonial.rating} />
+                    <p className="text-sm leading-relaxed text-slate-600">
+                      &ldquo;{testimonial.comment}&rdquo;
+                    </p>
+                    <div>
+                      <p className="font-semibold text-slate-900">{testimonial.customerName}</p>
+                      {testimonial.customerLocation ? (
+                        <p className="text-sm text-slate-500">{testimonial.customerLocation}</p>
+                      ) : null}
+                      {testimonial.productName ? (
+                        <p className="text-xs text-slate-400">Compró: {testimonial.productName}</p>
+                      ) : null}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      ) : null}
 
       {/* NEWSLETTER */}
       <section className="bg-slate-900 py-16 text-white sm:py-20">

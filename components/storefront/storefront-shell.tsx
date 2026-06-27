@@ -3,20 +3,15 @@
 import Link from 'next/link'
 import { Search, User, ShoppingCart, Store, Mail, Phone, MapPin } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
-import { resolveStorefrontStore } from '@/lib/storefront-server'
 import type { StorefrontStore } from '@/lib/storefront'
-import { storefrontHref } from '@/lib/storefront'
+import { buildWhatsappUrl, normalizeSocialUrl, storefrontHref } from '@/lib/storefront'
 
 type StorefrontShellProps = {
   store: StorefrontStore | null
   children: React.ReactNode
 }
 
-function StoreLogo({
-  store,
-}: {
-  store: StorefrontStore
-}) {
+function StoreLogo({ store }: { store: StorefrontStore }) {
   if (store.logoUrl) {
     return (
       <img
@@ -43,6 +38,15 @@ export function StorefrontShell({ store, children }: StorefrontShellProps) {
 
   const homeHref = storefrontHref('/storefront', storeSlug)
   const productsHref = storefrontHref('/storefront/products', storeSlug)
+
+  const hasContactInfo = Boolean(
+    store?.footerEmail ||
+      store?.footerPhone ||
+      store?.footerAddress ||
+      store?.footerWhatsapp,
+  )
+
+  const hasSocialLinks = Boolean(store?.footerInstagram || store?.footerFacebook)
 
   return (
     <div className="flex min-h-screen flex-col bg-white">
@@ -128,6 +132,32 @@ export function StorefrontShell({ store, children }: StorefrontShellProps) {
                 {store?.description ??
                   'Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago.'}
               </p>
+              {hasSocialLinks ? (
+                <div className="mt-4 flex gap-3">
+                  {store?.footerInstagram ? (
+                    <a
+                      href={normalizeSocialUrl(store.footerInstagram, 'https://instagram.com/')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-slate-400 transition hover:text-white"
+                      aria-label="Instagram"
+                    >
+                      Instagram
+                    </a>
+                  ) : null}
+                  {store?.footerFacebook ? (
+                    <a
+                      href={normalizeSocialUrl(store.footerFacebook, 'https://facebook.com/')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-slate-400 transition hover:text-white"
+                      aria-label="Facebook"
+                    >
+                      Facebook
+                    </a>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             <div>
               <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider">Enlaces rápidos</h4>
@@ -159,20 +189,46 @@ export function StorefrontShell({ store, children }: StorefrontShellProps) {
                 </li>
               </ul>
             </div>
-            <div>
-              <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider">Contacto</h4>
-              <ul className="space-y-2 text-sm text-slate-400">
-                <li className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" /> contacto@{storeSlug ?? 'tienda'}.com
-                </li>
-                <li className="flex items-center gap-2">
-                  <Phone className="h-4 w-4" /> WhatsApp
-                </li>
-                <li className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" /> Argentina
-                </li>
-              </ul>
-            </div>
+            {hasContactInfo ? (
+              <div>
+                <h4 className="mb-4 text-sm font-semibold uppercase tracking-wider">Contacto</h4>
+                <ul className="space-y-2 text-sm text-slate-400">
+                  {store?.footerEmail ? (
+                    <li className="flex items-center gap-2">
+                      <Mail className="h-4 w-4 shrink-0" />
+                      <a href={`mailto:${store.footerEmail}`} className="hover:text-white">
+                        {store.footerEmail}
+                      </a>
+                    </li>
+                  ) : null}
+                  {store?.footerPhone ? (
+                    <li className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 shrink-0" />
+                      <span>{store.footerPhone}</span>
+                    </li>
+                  ) : null}
+                  {store?.footerWhatsapp ? (
+                    <li className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 shrink-0" />
+                      <a
+                        href={buildWhatsappUrl(store.footerWhatsapp)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-white"
+                      >
+                        WhatsApp
+                      </a>
+                    </li>
+                  ) : null}
+                  {store?.footerAddress ? (
+                    <li className="flex items-start gap-2">
+                      <MapPin className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span>{store.footerAddress}</span>
+                    </li>
+                  ) : null}
+                </ul>
+              </div>
+            ) : null}
           </div>
           <div className="mt-8 border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
             © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.

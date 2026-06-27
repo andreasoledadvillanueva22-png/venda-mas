@@ -1,10 +1,15 @@
 import { headers } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { getStoreBySlug } from '@/lib/tenant'
-import type { StorefrontStore } from '@/lib/storefront'
+import type { StorefrontStore, StorefrontTestimonial } from '@/lib/storefront'
 
 const STOREFRONT_STORE_SELECT =
-  'id, name, slug, logo_url, hero_image_url, description, free_shipping_threshold'
+  'id, name, slug, logo_url, hero_image_url, description, free_shipping_threshold, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook'
+
+function normalizeOptionalText(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
 
 function normalizeOptionalUrl(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
@@ -19,6 +24,12 @@ function mapStoreRow(store: {
   hero_image_url: string | null
   description: string | null
   free_shipping_threshold: number | null
+  footer_email: string | null
+  footer_phone: string | null
+  footer_address: string | null
+  footer_whatsapp: string | null
+  footer_instagram: string | null
+  footer_facebook: string | null
 }): StorefrontStore {
   return {
     id: store.id,
@@ -26,8 +37,14 @@ function mapStoreRow(store: {
     slug: store.slug,
     logoUrl: normalizeOptionalUrl(store.logo_url),
     heroImageUrl: normalizeOptionalUrl(store.hero_image_url),
-    description: store.description?.trim() || null,
+    description: normalizeOptionalText(store.description),
     freeShippingThreshold: Number(store.free_shipping_threshold ?? 50000),
+    footerEmail: normalizeOptionalText(store.footer_email),
+    footerPhone: normalizeOptionalText(store.footer_phone),
+    footerAddress: normalizeOptionalText(store.footer_address),
+    footerWhatsapp: normalizeOptionalText(store.footer_whatsapp),
+    footerInstagram: normalizeOptionalText(store.footer_instagram),
+    footerFacebook: normalizeOptionalText(store.footer_facebook),
   }
 }
 
@@ -55,18 +72,7 @@ export async function fetchStorefrontStoreBySlug(
     return null
   }
 
-  const supabase = await createClient()
-  const { data, error } = await supabase
-    .from('stores')
-    .select(STOREFRONT_STORE_SELECT)
-    .eq('id', store.id)
-    .maybeSingle()
-
-  if (error || !data) {
-    return null
-  }
-
-  return mapStoreRow(data)
+  return fetchStoreById(store.id)
 }
 
 export async function resolveStorefrontStore(
@@ -117,4 +123,28 @@ export async function getStoreCategories(storeId: string): Promise<string[]> {
   }
 
   return Array.from(categories).sort((a, b) => a.localeCompare(b, 'es'))
+}
+
+export async function getStoreTestimonials(storeId: string): Promise<StorefrontTestimonial[]> {
+  const supabase = await createClient()
+
+  const { data: rows, error } = await supabase
+    .from('testimonials')
+    .select('id, customer_name, customer_location, product_name, rating, comment')
+    .eq('store_id', storeId)
+    .order('created_at', { ascending: false })
+    .limit(6)
+
+  if (error || !rows) {
+    return []
+  }
+
+  return rows.map((row) => ({
+    id: row.id,
+    customerName: row.customer_name,
+    customerLocation: row.customer_location?.trim() || null,
+    productName: row.product_name?.trim() || null,
+    rating: Number(row.rating ?? 5),
+    comment: row.comment,
+  }))
 }

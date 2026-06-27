@@ -57,12 +57,29 @@ type DbStore = {
   custom_domain: string | null
   domain_verified: boolean | null
   domain_verification_token: string | null
+  footer_email: string | null
+  footer_phone: string | null
+  footer_address: string | null
+  footer_whatsapp: string | null
+  footer_instagram: string | null
+  footer_facebook: string | null
+}
+
+type DbTestimonial = {
+  id: string
+  customer_name: string
+  customer_location: string | null
+  product_name: string | null
+  rating: number | null
+  comment: string
+  created_at: string
 }
 
 type SettingsData = {
   email: string
   profile: DbProfile
   store: DbStore
+  testimonials: DbTestimonial[]
 }
 
 type SettingsPageProps = {
@@ -85,6 +102,11 @@ type SettingsPageProps = {
     domain_error?: string
     hero_saved?: string
     hero_error?: string
+    footer_saved?: string
+    footer_error?: string
+    testimonial_saved?: string
+    testimonial_error?: string
+    testimonial_deleted?: string
   }>
 }
 
@@ -149,6 +171,55 @@ function parseRequiredBankField(
   return { value: value.trim() }
 }
 
+function parseOptionalText(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const trimmed = value.trim()
+  return trimmed || null
+}
+
+function parseTestimonialRating(value: FormDataEntryValue | null): number {
+  if (typeof value !== 'string' || !value.trim()) {
+    return 5
+  }
+
+  const parsed = Number(value)
+
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > 5) {
+    return 5
+  }
+
+  return parsed
+}
+
+async function verifyOwnedStore(storeId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { supabase, user: null, store: null as null }
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    return { supabase, user, store: null as null }
+  }
+
+  return { supabase, user, store }
+}
+
 async function getSettingsData(): Promise<SettingsData | null> {
   const supabase = await createClient()
 
@@ -174,7 +245,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, custom_domain, domain_verified, domain_verification_token',
+      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -183,10 +254,17 @@ async function getSettingsData(): Promise<SettingsData | null> {
     return null
   }
 
+  const { data: testimonials } = await supabase
+    .from('testimonials')
+    .select('id, customer_name, customer_location, product_name, rating, comment, created_at')
+    .eq('store_id', store.id)
+    .order('created_at', { ascending: false })
+
   return {
     email: user.email,
     profile: profile as DbProfile,
     store: store as DbStore,
+    testimonials: (testimonials ?? []) as DbTestimonial[],
   }
 }
 
@@ -331,6 +409,157 @@ export async function saveHeroImage(formData: FormData): Promise<void> {
   revalidatePath('/admin/settings')
   revalidatePath('/storefront')
   redirect('/admin/settings?hero_saved=1')
+}
+
+export async function saveFooterSettings(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?footer_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  const { supabase, user, store } = await verifyOwnedStore(storeId.trim())
+
+  if (!user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  if (!store) {
+    redirect(
+      `/admin/settings?footer_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({
+      footer_email: parseOptionalText(formData.get('footerEmail')),
+      footer_phone: parseOptionalText(formData.get('footerPhone')),
+      footer_address: parseOptionalText(formData.get('footerAddress')),
+      footer_whatsapp: parseOptionalText(formData.get('footerWhatsapp')),
+      footer_instagram: parseOptionalText(formData.get('footerInstagram')),
+      footer_facebook: parseOptionalText(formData.get('footerFacebook')),
+    })
+    .eq('id', store.id)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?footer_error=${encodeURIComponent('No se pudo guardar el footer.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront')
+  redirect('/admin/settings?footer_saved=1')
+}
+
+export async function saveTestimonial(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const customerName = formData.get('customerName')
+  const comment = formData.get('comment')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  if (typeof customerName !== 'string' || !customerName.trim()) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('El nombre del cliente es obligatorio.')}`,
+    )
+  }
+
+  if (typeof comment !== 'string' || !comment.trim()) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('El comentario es obligatorio.')}`,
+    )
+  }
+
+  const { supabase, user, store } = await verifyOwnedStore(storeId.trim())
+
+  if (!user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  if (!store) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: insertError } = await supabase.from('testimonials').insert({
+    store_id: store.id,
+    customer_name: customerName.trim(),
+    customer_location: parseOptionalText(formData.get('customerLocation')),
+    product_name: parseOptionalText(formData.get('productName')),
+    rating: parseTestimonialRating(formData.get('rating')),
+    comment: comment.trim(),
+  })
+
+  if (insertError) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No se pudo guardar el testimonio.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront')
+  redirect('/admin/settings?testimonial_saved=1')
+}
+
+export async function deleteTestimonial(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const testimonialId = formData.get('testimonialId')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  if (typeof testimonialId !== 'string' || !testimonialId.trim()) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No se pudo identificar el testimonio.')}`,
+    )
+  }
+
+  const { supabase, user, store } = await verifyOwnedStore(storeId.trim())
+
+  if (!user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  if (!store) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: deleteError } = await supabase
+    .from('testimonials')
+    .delete()
+    .eq('id', testimonialId.trim())
+    .eq('store_id', store.id)
+
+  if (deleteError) {
+    redirect(
+      `/admin/settings?testimonial_error=${encodeURIComponent('No se pudo eliminar el testimonio.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront')
+  redirect('/admin/settings?testimonial_deleted=1')
 }
 
 export async function saveMercadoPagoCredentials(formData: FormData): Promise<void> {
@@ -970,6 +1199,11 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     domain_error,
     hero_saved,
     hero_error,
+    footer_saved,
+    footer_error,
+    testimonial_saved,
+    testimonial_error,
+    testimonial_deleted,
   } = await searchParams
   const settings = await getSettingsData()
 
@@ -977,7 +1211,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     redirect('/auth/login?redirect=/admin/settings')
   }
 
-  const { email, profile, store } = settings
+  const { email, profile, store, testimonials } = settings
   const primaryColor = store.primary_color ?? DEFAULT_PRIMARY_COLOR
   const secondaryColor = store.secondary_color ?? DEFAULT_SECONDARY_COLOR
   const hasMercadoPagoCredentials = Boolean(store.mp_access_token && store.mp_public_key)
@@ -1110,6 +1344,36 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {hero_error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {hero_error}
+          </div>
+        ) : null}
+
+        {footer_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Datos del footer guardados correctamente
+          </div>
+        ) : null}
+
+        {footer_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {footer_error}
+          </div>
+        ) : null}
+
+        {testimonial_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Testimonio agregado correctamente
+          </div>
+        ) : null}
+
+        {testimonial_deleted === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Testimonio eliminado
+          </div>
+        ) : null}
+
+        {testimonial_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {testimonial_error}
           </div>
         ) : null}
 
@@ -1280,6 +1544,194 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
               Guardar configuración
             </Button>
           </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Footer del storefront</CardTitle>
+              <CardDescription>
+                Datos de contacto y redes sociales visibles en el pie de tu tienda.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form action={saveFooterSettings} className="space-y-4">
+                <input type="hidden" name="storeId" value={store.id} />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="footerEmail">Email de contacto</Label>
+                    <Input
+                      id="footerEmail"
+                      name="footerEmail"
+                      type="email"
+                      defaultValue={store.footer_email ?? ''}
+                      placeholder="contacto@mitienda.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="footerPhone">Teléfono</Label>
+                    <Input
+                      id="footerPhone"
+                      name="footerPhone"
+                      defaultValue={store.footer_phone ?? ''}
+                      placeholder="+54 9 11 1234 5678"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="footerAddress">Dirección</Label>
+                  <Input
+                    id="footerAddress"
+                    name="footerAddress"
+                    defaultValue={store.footer_address ?? ''}
+                    placeholder="Ciudad, Provincia, Argentina"
+                  />
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="space-y-2">
+                    <Label htmlFor="footerWhatsapp">WhatsApp</Label>
+                    <Input
+                      id="footerWhatsapp"
+                      name="footerWhatsapp"
+                      defaultValue={store.footer_whatsapp ?? ''}
+                      placeholder="5491123456789"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="footerInstagram">Instagram</Label>
+                    <Input
+                      id="footerInstagram"
+                      name="footerInstagram"
+                      defaultValue={store.footer_instagram ?? ''}
+                      placeholder="https://instagram.com/tutienda"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="footerFacebook">Facebook</Label>
+                    <Input
+                      id="footerFacebook"
+                      name="footerFacebook"
+                      defaultValue={store.footer_facebook ?? ''}
+                      placeholder="https://facebook.com/tutienda"
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                  Guardar footer
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Testimonios de clientes</CardTitle>
+              <CardDescription>
+                Opiniones que se muestran en la home de tu tienda. Si no hay testimonios, la sección
+                se oculta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {testimonials.length > 0 ? (
+                <div className="space-y-3">
+                  {testimonials.map((testimonial) => (
+                    <div
+                      key={testimonial.id}
+                      className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-semibold text-foreground">{testimonial.customer_name}</p>
+                        {testimonial.customer_location ? (
+                          <p className="text-sm text-muted-foreground">
+                            {testimonial.customer_location}
+                          </p>
+                        ) : null}
+                        <p className="text-sm text-foreground">&ldquo;{testimonial.comment}&rdquo;</p>
+                        <p className="text-xs text-muted-foreground">
+                          {testimonial.rating ?? 5} estrellas
+                          {testimonial.product_name ? ` · ${testimonial.product_name}` : ''}
+                        </p>
+                      </div>
+                      <form action={deleteTestimonial}>
+                        <input type="hidden" name="storeId" value={store.id} />
+                        <input type="hidden" name="testimonialId" value={testimonial.id} />
+                        <Button type="submit" variant="outline" size="sm">
+                          Eliminar
+                        </Button>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Todavía no agregaste testimonios para tu tienda.
+                </p>
+              )}
+
+              <form action={saveTestimonial} className="space-y-4 border-t border-border pt-6">
+                <input type="hidden" name="storeId" value={store.id} />
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="customerName">Nombre del cliente</Label>
+                    <Input
+                      id="customerName"
+                      name="customerName"
+                      placeholder="María González"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerLocation">Ubicación</Label>
+                    <Input
+                      id="customerLocation"
+                      name="customerLocation"
+                      placeholder="Buenos Aires"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="productName">Producto comprado (opcional)</Label>
+                    <Input id="productName" name="productName" placeholder="Remera clásica" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="rating">Calificación (1-5)</Label>
+                    <Input
+                      id="rating"
+                      name="rating"
+                      type="number"
+                      min={1}
+                      max={5}
+                      defaultValue={5}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="comment">Comentario</Label>
+                  <textarea
+                    id="comment"
+                    name="comment"
+                    rows={3}
+                    required
+                    placeholder="Excelente atención y productos de calidad..."
+                    className={cn(
+                      'w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition',
+                      'focus-visible:border-ring focus-visible:ring-ring/50',
+                    )}
+                  />
+                </div>
+
+                <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                  Agregar testimonio
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
         </div>
 
         <Card>
