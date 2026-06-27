@@ -5,25 +5,31 @@
 - **Lenguaje:** TypeScript (estricto)
 - **Base de datos:** Supabase (PostgreSQL)
 - **Estilos:** Tailwind CSS
-- **Deploy:** Vercel
+- **Deploy:** Vercel (plan Hobby)
 - **Pagos:** Mercado Pago (Checkout Pro)
 - **Auth:** Supabase Auth
+- **Email:** Resend (pendiente implementar)
 
 ## Arquitectura
 - SaaS multi-tenant: cada usuario tiene su propia tienda
 - Rutas: `/admin/*` (dashboard), `/storefront/*` (tienda pública), `/auth/*` (login/registro)
 - Multi-tenancy por `store_id` en todas las tablas relacionadas
-- Subdominios wildcard: `tienda.vendemas.app` → `/storefront?store=tienda`
+- Subdominios wildcard preparados: `tienda.vendemas.app` (pendiente comprar dominio)
+- Dominios personalizados: estructura preparada, pendiente activar
 - Checkout como invitado permitido (sin login obligatorio)
 
 ## Reglas de Negocio Críticas
 1. **NUNCA** hardcodear credenciales de Mercado Pago (siempre usar `process.env` o `stores.mp_access_token`)
 2. **SIEMPRE** filtrar queries por `store_id` o `owner_id` para aislamiento multi-tenant
 3. **NUNCA** exponer datos de una tienda a otra (violación de RLS)
-4. Las credenciales de MP deben empezar con `APP_USR-` (producción), no `TEST-` (prueba)
+4. Las credenciales de MP deben empezar con `APP_USR-` (producción) o `TEST-` (prueba)
 5. El slug de la tienda debe ser único (agregar sufijo numérico si existe)
 6. Checkout debe funcionar sin login (guest checkout)
 7. Webhooks de MP deben verificar que la orden pertenezca a la tienda correcta
+8. Los pop-ups de urgencia usan datos ficticios configurables por tienda (no datos reales de compradores)
+9. Cada tienda puede tener hasta 10 mensajes de urgencia ficticios
+10. Los productos pueden tener video (YouTube, Vimeo o URL directa)
+11. Las reseñas pueden importarse de Mercado Libre, Amazon o AliExpress
 
 ## Convenciones de Código
 - Usar Server Actions para mutaciones (no API routes cuando sea posible)
@@ -33,30 +39,36 @@
 - No usar `any` en TypeScript
 - Imports ordenados: primero externos, luego internos
 - Nombres de archivos: kebab-case para componentes, camelCase para librerías
+- Descripciones de productos: estructura con bullets, specs técnicas, video, reseñas y descripción larga
 
 ## Estructura de Base de Datos (Supabase)
 Tablas principales:
-- `profiles`: usuarios (id, email, name)
-- `stores`: tiendas (id, owner_id, name, slug, mp_access_token, mp_public_key, shipping_config, etc.)
-- `products`: productos (id, store_id, name, price, stock, image_url)
-- `orders`: órdenes (id, store_id, customer_name, customer_email, customer_phone, customer_address, total, status, shipping_method, payment_method, is_guest, profile_id)
+- `profiles`: usuarios (id, email, name, store_slug)
+- `stores`: tiendas (id, owner_id, name, slug, mp_access_token, mp_public_key, shipping_config, footer_*, favicon_url, enable_local_pickup, pickup_*, bank_*)
+- `products`: productos (id, store_id, name, price, stock, image_url, video_url, category, description, is_featured, discount_percentage)
+- `orders`: órdenes (id, store_id, customer_name, customer_email, customer_phone, customer_address, total, status, shipping_method, payment_method, is_guest, profile_id, mp_payment_id, paid_at, payment_status)
 - `order_items`: items de orden (id, order_id, product_id, quantity, price)
+- `testimonials`: testimonios reales (id, store_id, customer_name, rating, comment, created_at)
+- `purchase_notifications`: mensajes de urgencia ficticios (id, store_id, customer_name, customer_city, product_name, created_at)
+- `product_reviews`: reseñas importadas (id, store_id, product_id, source, source_url, customer_name, rating, comment, created_at)
 
 Políticas RLS:
 - Usuarios solo ven/editan sus propias tiendas y datos relacionados
-- Storefront puede leer datos públicos de tiendas (productos, info básica)
+- Storefront puede leer datos públicos de tiendas (productos, info básica, testimonios, reseñas, notificaciones de urgencia)
 - INSERT en orders/order_items permitido para cualquier usuario (invitados incluidos)
 
 ## Deploy y Variables de Entorno
 - Vercel: `vercel --prod` para producción
-- Variables críticas: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_MP_CLIENT_ID`, `NEXT_MP_CLIENT_SECRET`, `NEXT_MP_REDIRECT_URI`
+- Variables críticas: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `NEXT_MP_CLIENT_ID`, `NEXT_MP_CLIENT_SECRET`, `NEXT_MP_REDIRECT_URI`, `RESEND_API_KEY` (pendiente)
 - Migraciones SQL en carpeta `supabase/` con nombres descriptivos
 
 ## Comportamiento Esperado de la IA
-- Antes de modificar código, leer archivos relevantes para entender contexto
+- Antes de modificar código, leer `PROJECT_CONTEXT.md` para entender estado actual
 - Ejecutar `npm run build` después de cambios significativos
 - Si hay error de build, corregirlo antes de continuar
 - No romper funcionalidad existente al agregar nuevas features
 - Priorizar seguridad y aislamiento multi-tenant
 - Generar migraciones SQL cuando se modifique el schema
 - Documentar cambios importantes en `PROJECT_CONTEXT.md`
+- Mantener diseño mobile-first y responsive
+- Usar datos ficticios realistas para pop-ups de urgencia (no datos fake genéricos)
