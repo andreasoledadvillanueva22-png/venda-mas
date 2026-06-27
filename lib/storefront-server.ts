@@ -1,11 +1,16 @@
 import { headers } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getStoreBySlug } from '@/lib/tenant'
-import type { StorefrontStore, StorefrontTestimonial } from '@/lib/storefront'
+import type {
+  StorefrontRecentPurchase,
+  StorefrontStore,
+  StorefrontTestimonial,
+} from '@/lib/storefront'
 import { isLikelyDirectImageUrl } from '@/lib/storefront'
 
 const STOREFRONT_STORE_SELECT =
-  'id, name, slug, logo_url, hero_image_url, description, free_shipping_threshold, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook'
+  'id, name, slug, logo_url, favicon_url, hero_image_url, description, free_shipping_threshold, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook'
 
 function normalizeOptionalText(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
@@ -25,11 +30,20 @@ function normalizeHeroImageUrl(value: string | null | undefined): string | null 
   return isLikelyDirectImageUrl(trimmed) ? trimmed : null
 }
 
+function normalizeFaviconUrl(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed) {
+    return null
+  }
+  return isLikelyDirectImageUrl(trimmed) ? trimmed : null
+}
+
 function mapStoreRow(store: {
   id: string
   name: string
   slug: string
   logo_url: string | null
+  favicon_url: string | null
   hero_image_url: string | null
   description: string | null
   free_shipping_threshold: number | null
@@ -45,6 +59,7 @@ function mapStoreRow(store: {
     name: store.name,
     slug: store.slug,
     logoUrl: normalizeOptionalUrl(store.logo_url),
+    faviconUrl: normalizeFaviconUrl(store.favicon_url),
     heroImageUrl: normalizeHeroImageUrl(store.hero_image_url),
     description: normalizeOptionalText(store.description),
     freeShippingThreshold: Number(store.free_shipping_threshold ?? 50000),
@@ -156,4 +171,68 @@ export async function getStoreTestimonials(storeId: string): Promise<StorefrontT
     rating: Number(row.rating ?? 5),
     comment: row.comment,
   }))
+}
+
+function getCustomerFirstName(fullName: string): string {
+  const firstName = fullName.trim().split(/\s+/)[0]
+  return firstName || 'Alguien'
+}
+
+function getMinutesAgo(isoDate: string): number {
+  const createdAt = new Date(isoDate).getTime()
+  if (Number.isNaN(createdAt)) {
+    return 0
+  }
+  return Math.max(0, Math.floor((Date.now() - createdAt) / 60_000))
+}
+
+function getProductNameFromOrderItem(
+  products: { name: string } | { name: string }[] | null,
+): string | null {
+  if (!products) {
+    return null
+  }
+  if (Array.isArray(products)) {
+    return products[0]?.name?.trim() || null
+  }
+  return products.name?.trim() || null
+}
+
+export async function getRecentPurchaseNotifications(
+  storeId: string,
+  limit = 5,
+): Promise<StorefrontRecentPurchase[]> {
+  const admin = createAdminClient()
+
+  const { data: orders, error } = await admin
+    .from('orders')
+    .select('customer_name, created_at, order_items(products(name))')
+    .eq('store_id', storeId)
+    .in('status', ['paid', 'shipped', 'delivered'])
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error || !orders) {
+    return []
+  }
+
+  const notifications: StorefrontRecentPurchase[] = []
+
+  for (const order of orders) {
+    const items = order.order_items as Array<{ products: { name: string } | { name: string }[] | null }> | null
+    const firstItem = items?.[0]
+    const productName = firstItem ? getProductNameFromOrderItem(firstItem.products) : null
+
+    if (!productName || typeof order.customer_name !== 'string') {
+      continue
+    }
+
+    notifications.push({
+      customerFirstName: getCustomerFirstName(order.customer_name),
+      productName,
+      minutesAgo: getMinutesAgo(order.created_at as string),
+    })
+  }
+
+  return notifications
 }

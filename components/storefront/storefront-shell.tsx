@@ -3,11 +3,14 @@
 import Link from 'next/link'
 import { Search, User, ShoppingCart, Store, Mail, Phone, MapPin } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
-import type { StorefrontStore } from '@/lib/storefront'
+import type { StorefrontRecentPurchase, StorefrontStore } from '@/lib/storefront'
 import { buildWhatsappUrl, normalizeSocialUrl, storefrontHref } from '@/lib/storefront'
+import { FloatingWhatsappButton } from '@/components/storefront/floating-whatsapp-button'
+import { RecentPurchaseNotifications } from '@/components/storefront/recent-purchase-notifications'
 
 type StorefrontShellProps = {
   store: StorefrontStore | null
+  recentPurchases?: StorefrontRecentPurchase[]
   children: React.ReactNode
 }
 
@@ -29,7 +32,7 @@ function StoreLogo({ store }: { store: StorefrontStore }) {
   )
 }
 
-export function StorefrontShell({ store, children }: StorefrontShellProps) {
+export function StorefrontShell({ store, recentPurchases = [], children }: StorefrontShellProps) {
   const { totalItems, setIsCartOpen } = useCart()
   const storeSlug = store?.slug ?? null
   const storeName = store?.name ?? 'Tienda Online'
@@ -235,6 +238,12 @@ export function StorefrontShell({ store, children }: StorefrontShellProps) {
           </div>
         </div>
       </footer>
+
+      <RecentPurchaseNotifications notifications={recentPurchases} />
+
+      {store?.footerWhatsapp ? (
+        <FloatingWhatsappButton phone={store.footerWhatsapp} storeName={store.name} />
+      ) : null}
     </div>
   )
 }

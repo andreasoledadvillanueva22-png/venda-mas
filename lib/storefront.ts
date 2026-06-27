@@ -3,6 +3,7 @@ export type StorefrontStore = {
   name: string
   slug: string
   logoUrl: string | null
+  faviconUrl: string | null
   heroImageUrl: string | null
   description: string | null
   freeShippingThreshold: number
@@ -13,6 +14,14 @@ export type StorefrontStore = {
   footerInstagram: string | null
   footerFacebook: string | null
 }
+
+export type StorefrontRecentPurchase = {
+  customerFirstName: string
+  productName: string
+  minutesAgo: number
+}
+
+export const DEFAULT_STOREFRONT_FAVICON = '/icon.svg'
 
 export type StorefrontTestimonial = {
   id: string
@@ -46,7 +55,7 @@ export function buildWhatsappUrl(phone: string): string {
 export function isLikelyDirectImageUrl(url: string): boolean {
   try {
     const parsed = new URL(url)
-    if (/\.(jpg|jpeg|png|gif|webp|svg|avif)(\?.*)?$/i.test(parsed.pathname)) {
+    if (/\.(jpg|jpeg|png|gif|webp|svg|avif|ico)(\?.*)?$/i.test(parsed.pathname)) {
       return true
     }
     if (parsed.hostname.includes('supabase.co') && parsed.pathname.includes('/storage/')) {

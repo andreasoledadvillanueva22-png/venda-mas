@@ -36,6 +36,7 @@ type DbStore = {
   name: string
   slug: string
   logo_url: string | null
+  favicon_url: string | null
   hero_image_url: string | null
   description: string | null
   primary_color: string | null
@@ -247,7 +248,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook',
+      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -279,6 +280,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
   const storeSlugRaw = formData.get('storeSlug')
   const description = formData.get('description')
   const logoUrl = formData.get('logoUrl')
+  const faviconUrl = formData.get('faviconUrl')
   const primaryColor = formData.get('primaryColor')
   const secondaryColor = formData.get('secondaryColor')
 
@@ -316,6 +318,9 @@ export async function saveSettings(formData: FormData): Promise<void> {
 
   const parsedLogoUrl =
     typeof logoUrl === 'string' && logoUrl.trim() ? logoUrl.trim() : null
+
+  const parsedFaviconUrl =
+    typeof faviconUrl === 'string' && faviconUrl.trim() ? faviconUrl.trim() : null
 
   const supabase = await createClient()
 
@@ -368,6 +373,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
       slug: slugValidation.slug,
       description: parsedDescription,
       logo_url: parsedLogoUrl,
+      favicon_url: parsedFaviconUrl,
       primary_color: normalizedPrimaryColor,
       secondary_color: normalizedSecondaryColor,
     })
@@ -1499,6 +1505,29 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
                   defaultValue={store.logo_url ?? ''}
                   placeholder="https://ejemplo.com/logo.png"
                 />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="faviconUrl">URL del favicon</Label>
+                <Input
+                  id="faviconUrl"
+                  name="faviconUrl"
+                  type="url"
+                  form="settings-form"
+                  defaultValue={store.favicon_url ?? ''}
+                  placeholder="https://ejemplo.com/favicon.ico"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Ícono de la pestaña del navegador (ICO, PNG o SVG). Si está vacío, se usa el favicon
+                  predeterminado de VendaMás.
+                </p>
+                {store.favicon_url ? (
+                  <img
+                    src={store.favicon_url}
+                    alt="Vista previa del favicon"
+                    className="h-8 w-8 rounded border border-border object-contain"
+                  />
+                ) : null}
               </div>
 
               <form action={saveHeroImage} className="space-y-4 border-t border-border pt-6">

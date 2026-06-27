@@ -3,7 +3,6 @@ import type { Metadata } from 'next'
 import {
   ArrowRight,
   Star,
-  CheckCircle2,
   Store,
 } from 'lucide-react'
 import type { CatalogProduct } from '@/components/storefront/products-catalog'
@@ -31,15 +30,6 @@ const CATEGORY_COLORS = [
   'from-amber-500 to-amber-700',
   'from-cyan-500 to-cyan-700',
 ]
-
-const POPUP_PRODUCT_LIMIT = 5
-const POPUP_ROTATION_SECONDS = 20
-const POPUP_VISIBLE_SECONDS = 5
-
-type RecentPurchaseNotification = {
-  productName: string
-  minutes: number
-}
 
 type StorefrontPageProps = {
   searchParams: Promise<{ store?: string }>
@@ -87,21 +77,6 @@ function mapProduct(product: DbProduct): CatalogProduct {
   }
 }
 
-function shuffleProducts<T>(items: T[]): T[] {
-  const shuffled = [...items]
-
-  for (let index = shuffled.length - 1; index > 0; index -= 1) {
-    const randomIndex = Math.floor(Math.random() * (index + 1))
-    ;[shuffled[index], shuffled[randomIndex]] = [shuffled[randomIndex], shuffled[index]]
-  }
-
-  return shuffled
-}
-
-function getRandomPurchaseMinutes(): number {
-  return Math.floor(Math.random() * (30 - 5 + 1)) + 5
-}
-
 async function getHomepageProducts(storeId: string): Promise<CatalogProduct[]> {
   const supabase = await createClient()
   const selectFields =
@@ -137,37 +112,6 @@ async function getHomepageProducts(storeId: string): Promise<CatalogProduct[]> {
 
 function isPromoProduct(product: CatalogProduct): boolean {
   return Boolean(product.compareAtPrice && product.compareAtPrice > product.price)
-}
-
-async function getPopupProducts(storeId: string): Promise<CatalogProduct[]> {
-  const supabase = await createClient()
-
-  const { data: products, error } = await supabase
-    .from('products')
-    .select('id, name, description, price, compare_at_price, category, images, featured')
-    .eq('store_id', storeId)
-    .eq('active', true)
-
-  if (error || !products || products.length === 0) {
-    return []
-  }
-
-  const catalogProducts = products.map((product) => mapProduct(product as DbProduct))
-
-  return shuffleProducts(catalogProducts).slice(0, POPUP_PRODUCT_LIMIT)
-}
-
-function buildRecentPurchaseNotifications(
-  products: CatalogProduct[],
-): RecentPurchaseNotification[] {
-  if (products.length === 0) {
-    return []
-  }
-
-  return products.map((product) => ({
-    productName: product.name,
-    minutes: getRandomPurchaseMinutes(),
-  }))
 }
 
 async function getPromoProducts(storeId: string): Promise<CatalogProduct[]> {
@@ -264,63 +208,6 @@ function StarRating({ rating = 5 }: { rating?: number }) {
   )
 }
 
-function RecentPurchaseNotifications({
-  notifications,
-}: {
-  notifications: RecentPurchaseNotification[]
-}) {
-  if (notifications.length === 0) {
-    return null
-  }
-
-  const cycleDurationSeconds = notifications.length * POPUP_ROTATION_SECONDS
-  const visibleKeyframePercent = (POPUP_VISIBLE_SECONDS / cycleDurationSeconds) * 100
-
-  return (
-    <>
-      <style
-        dangerouslySetInnerHTML={{
-          __html: `
-            @keyframes recentPurchasePopup {
-              0%, ${visibleKeyframePercent}% {
-                opacity: 1;
-                transform: translateY(0);
-                visibility: visible;
-              }
-              ${visibleKeyframePercent + 0.01}%, 100% {
-                opacity: 0;
-                transform: translateY(16px);
-                visibility: hidden;
-              }
-            }
-            .recent-purchase-notification {
-              animation: recentPurchasePopup ${cycleDurationSeconds}s infinite;
-            }
-          `,
-        }}
-      />
-      <div className="pointer-events-none fixed bottom-6 left-4 z-50 h-28 w-[min(calc(100vw-2rem),20rem)] sm:left-6">
-        {notifications.map((purchase, index) => (
-          <div
-            key={`${purchase.productName}-${index}`}
-            className="recent-purchase-notification pointer-events-none absolute inset-x-0 bottom-0 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
-            style={{ animationDelay: `${index * POPUP_ROTATION_SECONDS}s` }}
-          >
-            <div className="flex items-start gap-3">
-              <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
-              <p className="text-sm leading-snug text-slate-700">
-                Alguien compró{' '}
-                <span className="font-semibold text-slate-900">{purchase.productName}</span> hace{' '}
-                {purchase.minutes} minutos
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </>
-  )
-}
-
 export default async function StorefrontPage({ searchParams }: StorefrontPageProps) {
   const params = await searchParams
   const requestedSlug = params.store?.trim()
@@ -344,8 +231,6 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
   const testimonials = await getStoreTestimonials(store.id)
   const featuredProducts = await getHomepageProducts(store.id)
   const promoProducts = await getPromoProducts(store.id)
-  const popupProducts = await getPopupProducts(store.id)
-  const recentPurchaseNotifications = buildRecentPurchaseNotifications(popupProducts)
   const promoSectionProducts =
     promoProducts.length > 0 ? promoProducts : featuredProducts.slice(0, 3)
 
@@ -360,8 +245,6 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
 
   return (
     <div>
-      <RecentPurchaseNotifications notifications={recentPurchaseNotifications} />
-
       {/* HERO */}
       <section className="overflow-hidden bg-gray-50">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
