@@ -1,155 +1,202 @@
 # VendaMás SaaS - Contexto del Proyecto
 
-**Última actualización:** 26/06/2026
+**Última actualización:** 13/06/2026
 
 ## Estado Actual
-✅ **Deploy en producción:** https://venda-mas.vercel.app
-✅ **Base de datos:** Supabase (syxgovzmpzbymilsmdivi)
-✅ **Repositorio:** GitHub (andreasoledadvillanueva22-png/venda-mas)
+✅ **Deploy en producción:** https://venda-mas.vercel.app  
+✅ **Base de datos:** Supabase (`syxgovzmpzbymilsmdvi`)  
+✅ **Repositorio:** GitHub (`andreasoledadvillanueva22-png/venda-mas`)  
+✅ **E2E automatizado:** `scripts/e2e-register-checkout.mjs` — **12/12 OK** (13/06/2026)
+
+## Tiendas de Referencia
+
+| Tienda | Slug | Storefront | MP configurado |
+|--------|------|------------|----------------|
+| Andrea | `andrea-tienda` | ✅ `?store=andrea-tienda` | ✅ `APP_USR-` (OAuth producción) |
+| Hector (HRF) | `hector` | ✅ `?store=hector` | ❌ Pendiente (TEST- manual mañana) |
+
+**Nota:** `?store=andrea` devuelve "Tienda no encontrada" — el slug correcto es `andrea-tienda` (no cambiar).
 
 ## Funcionalidades Implementadas
 
 ### ✅ Completas y Funcionando
-- [x] Registro de usuarios con onboarding automático
-- [x] Creación automática de tiendas (slug único)
+- [x] Registro de usuarios con onboarding automático (`POST /api/auth/onboarding`)
+- [x] Creación automática de tiendas (slug único, editable desde admin)
 - [x] Admin dashboard con datos reales (no mock)
 - [x] CRUD de productos (con imágenes, precios, stock)
-- [x] Gestión de órdenes (listado, filtros, detalle)
+- [x] Gestión de órdenes (listado, filtros, detalle, `is_guest`)
 - [x] Gestión de clientes
 - [x] Settings: configuración de envíos (umbral gratis, costo estándar, express)
-- [x] Settings: credenciales de Mercado Pago (por tienda)
-- [x] Settings: retiro en local (habilitar, dirección, horarios, instrucciones)
-- [x] Settings: transferencia bancaria (banco, CBU, alias, titular, CUIT)
-- [x] Storefront: página principal con hero, productos destacados
-- [x] Storefront: catálogo de productos con filtros
-- [x] Storefront: carrito de compras (funciona en móvil)
-- [x] Storefront: checkout como invitado (sin login)
-- [x] Storefront: botón "Comprar ahora" (agrega al carrito y va al checkout)
-- [x] Checkout: envío a domicilio (estándar, express, gratis por umbral)
-- [x] Checkout: retiro en local (costo $0)
-- [x] Checkout: pago por Mercado Pago (Checkout Pro)
-- [x] Checkout: pago por transferencia bancaria (muestra datos bancarios)
-- [x] Webhooks: Mercado Pago actualiza estado de órdenes
+- [x] Settings: credenciales de Mercado Pago (por tienda, acepta `APP_USR-` y `TEST-`)
+- [x] Settings: footer dinámico (email, teléfono, WhatsApp, redes)
+- [x] Settings: testimonios por tienda (tabla `testimonials` + RLS)
+- [x] Settings: retiro en local, transferencia bancaria
+- [x] Storefront multi-tenant (`?store=SLUG`, cookie `storefront_slug`, middleware)
+- [x] Storefront: header/footer/testimonials por tienda (sin hardcode)
+- [x] Storefront: catálogo, carrito, checkout invitado
+- [x] Checkout: Mercado Pago (Checkout Pro), transferencia, efectivo
+- [x] Webhooks: Mercado Pago multi-tenant por token de tienda
 - [x] Multi-tenancy: aislamiento completo por tienda (RLS en Supabase)
-- [x] Middleware: detección de subdominios y dominios personalizados
 
-### 🟡 Implementadas pero Pendientes de Activar
-- [ ] Dominio personalizado `andreatiendaonline.com` (DNS configurado en Cloudflare, pendiente verificar en Vercel)
+### 🟡 Implementadas pero Pendientes de Activar / Validar
+- [ ] Dominio personalizado `andreatiendaonline.com` (DNS en Cloudflare, pendiente verificar en Vercel)
 - [ ] Subdominios wildcard `*.vendemas.app` (pendiente comprar dominio)
+- [ ] Sandbox MP completo en Hector (credenciales `TEST-` — configuración manual pendiente)
+- [ ] Validación manual: pago sandbox → webhook → `status=paid` → admin orders
 
 ### ❌ Pendientes de Implementar
-- [ ] Landing page de marketing en `vendemas.app` (dominio raíz)
+- [ ] Landing page de marketing en `vendemas.app`
 - [ ] Email transaccional (confirmación de compra, recuperación de contraseña)
-- [ ] SEO y meta tags dinámicos por tienda
+- [ ] SEO y meta tags dinámicos por tienda (parcial: layout storefront ya usa nombre de tienda)
 - [ ] Términos y condiciones / política de privacidad
-- [ ] Selector multi-tienda en admin (si usuario tiene más de una tienda)
-- [ ] Sistema de planes/precios (free, pro, enterprise)
-- [ ] Analytics avanzado (gráficos de ventas, conversión)
+- [ ] Selector multi-tienda en admin
+- [ ] Sistema de planes/precios
+- [ ] Analytics avanzado
 - [ ] Notificaciones push para nuevas órdenes
+
+## Validación E2E — 13/06/2026
+
+### Script automatizado
+```bash
+node scripts/e2e-register-checkout.mjs
+```
+
+Variables opcionales:
+- `E2E_BASE_URL` — default `https://venda-mas.vercel.app`
+- `E2E_STORE_SLUG` — default `andrea-tienda` (mañana: `hector`)
+- `E2E_SKIP_REGISTRATION=1` — solo checkout + MP
+- `E2E_SKIP_CLEANUP=1` — conservar usuario de prueba
+
+### Resultado (12/12 ✅)
+| Paso | Resultado |
+|------|-----------|
+| Registro Supabase + profile + store | ✅ |
+| Login post-registro | ✅ |
+| Checkout guest (`is_guest=true`) | ✅ |
+| Preferencia MP + `pending_payment` | ✅ |
+| Storefront `?store=hector` | ✅ multi-tenant OK |
+| Storefront `?store=andrea-tienda` | ✅ |
+| Storefront slug inválido | ✅ "Tienda no encontrada" |
+
+### Orden de prueba en producción (conservar)
+- **Tienda:** Andrea (`andrea-tienda`)
+- **Orden ID:** `f2b26ab8-c5cb-4ade-a417-dd9a2ad75c0e`
+- **Cliente:** Comprador Invitado E2E
+- **Estado:** `pending_payment` (preferencia MP creada, pago no completado)
+
+### Fixes desplegados (commit `5729630`)
+- WhatsApp del hero usa `store.footerWhatsapp` (no hardcode)
+- Hero image: filtra URLs no directas (`ibb.co/...` → placeholder)
+- Pop-ups de compra: texto genérico (sin nombres fake)
+- Metadata root: "VendaMás" + metadata por tenant en storefront layout
+
+## Loop de Validación — Mañana (Hector + TEST-)
+
+**Prerequisitos manuales (Hector, admin → Settings):**
+1. Cargar **Public Key** y **Access Token** que empiecen con `TEST-`
+2. (Opcional) Configurar `footer_whatsapp` para botón WhatsApp en hero
+3. Corregir `hero_image_url` si sigue siendo link de página (`ibb.co/...` → URL directa `i.ibb.co/...` o Supabase Storage)
+
+**Checklist sandbox completo:**
+1. `E2E_STORE_SLUG=hector E2E_SKIP_REGISTRATION=1 node scripts/e2e-register-checkout.mjs`
+   - Esperar: `TEST- (sandbox)` + `sandbox_init_point` en initPoint
+2. Abrir `initPoint` en browser → pagar con [tarjetas de prueba MP](https://www.mercadopago.com.ar/developers/es/docs/checkout-pro/additional-content/test-cards)
+3. Verificar redirect a `/storefront/order-confirmation?order_id=...&status=approved`
+4. Verificar webhook: orden pasa a `paid` en admin → Orders
+5. Confirmar `is_guest=true` y datos del comprador invitado
+
+**URLs a verificar:**
+- https://venda-mas.vercel.app/storefront?store=hector
+- https://venda-mas.vercel.app/storefront/checkout?store=hector
 
 ## Problemas Conocidos y Soluciones
 
-### 1. Mercado Pago: Error "credenciales de prueba"
-**Causa:** Autopago (intentar pagar con la misma cuenta que creó la app)
-**Solución:** Usar cuenta diferente para probar pagos, o credenciales de producción completas
+### 1. Mercado Pago: Error "credenciales de prueba" / autopago
+**Causa:** Pagar con la misma cuenta que creó la app o credenciales mezcladas prod/test.  
+**Solución:** Usar cuenta compradora distinta; en sandbox usar solo tokens `TEST-`.
 
-### 2. Carrito congelado en móvil
-**Causa:** z-index, pointer-events, botón dentro de Link
-**Solución:** ✅ Corregido (drawer con portal, z-200, touch-manipulation)
+### 2. `.env.local` vs credenciales por tienda
+**Causa:** `NEXT_MP_CLIENT_SECRET` es OAuth de la **app**, no el token de cobro de cada tienda.  
+**Solución:** MP se configura en `stores.mp_access_token` / `stores.mp_public_key` vía admin o OAuth connect.
 
-### 3. Botón "Comprar ahora" no agregaba al carrito
-**Causa:** Era solo un Link sin lógica de carrito
-**Solución:** ✅ Corregido (nuevo componente BuyNowButton)
+### 3. Slug incorrecto en URLs
+**Causa:** `?store=andrea` no existe; slug real es `andrea-tienda`.  
+**Solución:** Usar slug exacto de la tabla `stores`.
 
-### 4. Admin mostraba datos mock
-**Causa:** Dashboard no leía de la base de datos
-**Solución:** ✅ Corregido (queries reales con getDashboardStats)
+### 4. Carrito congelado en móvil
+**Solución:** ✅ Corregido (drawer con portal, z-index)
 
-## Migraciones SQL Pendientes de Ejecutar
+### 5. Admin mostraba datos mock
+**Solución:** ✅ Corregido (`lib/admin-dashboard.ts`)
 
-**IMPORTANTE:** Ejecutar en este orden en Supabase SQL Editor:
+## Migraciones SQL
+
+Ejecutar en Supabase SQL Editor (orden recomendado):
 
 1. `supabase/add_guest_checkout_support.sql`
-   - Agrega columnas `is_guest` y `profile_id` a `orders`
-   - Política RLS para INSERT en `order_items`
-
 2. `supabase/add_custom_domain_to_stores.sql`
-   - Agrega columnas `custom_domain`, `domain_verified`, `domain_verification_token` a `stores`
-
 3. `supabase/fix_multitenant_rls.sql`
-   - Políticas RLS para INSERT en `profiles`, UPDATE en `orders`, DELETE en `products`
-
 4. `supabase/add_local_pickup_to_stores.sql`
-   - Agrega columnas `enable_local_pickup`, `pickup_address`, `pickup_instructions`, `pickup_schedule` a `stores`
-
 5. `supabase/add_bank_details_to_stores.sql`
-   - Agrega columnas `bank_name`, `cbu`, `alias`, `account_holder`, `cuit` a `stores`
+6. `supabase/add_storefront_content.sql` — footer columns + tabla `testimonials` + RLS
+
+**Verificación rápida:**
+```sql
+SELECT column_name FROM information_schema.columns
+WHERE table_name = 'stores' AND column_name LIKE 'footer_%';
+SELECT COUNT(*) FROM testimonials;
+```
 
 ## Próximos Pasos (Priorizados)
 
-### Prioridad 1: Validación E2E (ESTA SEMANA)
-1. Ejecutar las 5 migraciones SQL en Supabase
-2. Commit, push y deploy a Vercel
-3. Prueba de fuego: registrar usuario nuevo → crear tienda → cargar producto → configurar MP → comprar como invitado
-4. Verificar que todo funcione sin intervención manual
+### Prioridad 1: Sandbox Hector (MAÑANA)
+1. Configurar credenciales `TEST-` en admin de Hector
+2. Ejecutar loop sandbox (script + pago manual + webhook)
+3. Confirmar orden `paid` en admin
 
-### Prioridad 2: Dominio y Branding (PRÓXIMA SEMANA)
-1. Comprar dominio `vendemas.app` o `vendemas.shop` en Cloudflare
-2. Configurar DNS wildcard `*.vendemas.app`
-3. Agregar dominios en Vercel (`vendemas.app`, `www.vendemas.app`, `*.vendemas.app`)
-4. Implementar middleware para subdominios (ya está en código, solo configurar)
-5. Crear landing page para `vendemas.app`
+### Prioridad 2: Dominio y Branding
+1. Comprar `vendemas.app` o similar
+2. DNS wildcard + Vercel
+3. Landing page SaaS
 
-### Prioridad 3: Profesionalización (MES 2)
-1. Email transaccional con Resend o SendGrid
-2. SEO y meta tags
-3. Términos y condiciones
-4. Sistema de planes/precios
-
-### Prioridad 4: Escala (MES 3+)
-1. Migrar a Vercel Pro ($20/mes) para dominios personalizados
-2. Sistema self-service para dominios propios
-3. Analytics avanzado
-4. Marketing y adquisición de usuarios
+### Prioridad 3: Profesionalización
+1. Email transaccional (Resend/SendGrid)
+2. Términos y condiciones
+3. SEO completo por tienda
 
 ## Credenciales y Accesos
 
 ### Supabase
-- **URL:** https://supabase.com/dashboard/project/syxgovzmpzbymilsmdivi
-- **Project ID:** syxgovzmpzbymilsmdivi
+- **Dashboard:** https://supabase.com/dashboard/project/syxgovzmpzbymilsmdvi
+- **Project ID:** `syxgovzmpzbymilsmdvi`
 
 ### Vercel
 - **Proyecto:** venda-mas
 - **URL:** https://venda-mas.vercel.app
-- **Account:** andreasoledadvillanueva22-png
+- **Webhook MP:** `https://venda-mas.vercel.app/api/webhooks/mercadopago`
 
 ### Mercado Pago
-- **App:** Plataforma SaaS de e-commerce para tiendas online
-- **Client ID (producción):** 7658886029761092
-- **Public Key (producción):** APP_USR-cda5d23d-9f82-48b0-b2c2-faaa100d0091
-- **Access Token:** (ver Vercel Environment Variables)
+- **App OAuth Client ID:** `7658886029761092`
+- **Tokens de cobro:** por tienda en `stores` (no en `.env.local`)
 
 ### Dominios
-- **andreatiendaonline.com:** Comprado en Cloudflare, DNS configurado
-- **vendemas.app:** Pendiente de comprar
+- **andreatiendaonline.com:** Cloudflare, pendiente verificación Vercel
+- **vendemas.app:** pendiente de comprar
 
 ## Notas Importantes
 
-1. **NUNCA** commitear el archivo `.env.local` (está en `.gitignore`)
-2. Las variables de entorno de Vercel deben estar en los 3 ambientes (Production, Preview, Development)
-3. El webhook de MP debe apuntar a `https://venda-mas.vercel.app/api/webhooks/mercadopago`
-4. Para probar pagos reales, usar cuenta DIFERENTE a la del vendedor (evitar autopago)
-5. El checkout como invitado guarda `is_guest = true` y `profile_id = null` en orders
-6. Los usuarios logueados tienen `is_guest = false` y `profile_id` con su UUID
+1. **NUNCA** commitear `.env.local` (está en `.gitignore`)
+2. Variables de entorno en Vercel: Production, Preview, Development
+3. Configurar `NEXT_PUBLIC_APP_URL=https://venda-mas.vercel.app` en Vercel para `back_urls` de MP en producción
+4. Checkout invitado: `is_guest = true`, `profile_id = null`
+5. Slug Andrea: **`andrea-tienda`** (definitivo, no renombrar a `andrea`)
 
 ## Historial de Cambios Recientes
 
-- 26/06/2026: Implementado checkout como invitado (sin login)
-- 26/06/2026: Corregido bug del carrito en móvil (drawer con portal, z-index)
-- 26/06/2026: Corregido botón "Comprar ahora" (agrega al carrito y redirige)
-- 26/06/2026: Dashboard admin con datos reales (no mock)
-- 26/06/2026: Webhook de MP multi-tenant (verifica store_id)
-- 25/06/2026: Implementado retiro en local
-- 25/06/2026: Implementado pago por transferencia bancaria
-- 25/06/2026: Corregido banner duplicado de envío gratis
-- 24/06/2026: Credenciales de MP actualizadas a producción
+- **13/06/2026:** E2E 12/12 — script `scripts/e2e-register-checkout.mjs`, fixes storefront (WhatsApp, hero, metadata, pop-ups)
+- **13/06/2026:** Deploy producción (`5729630` — chore: E2E validation + minor fixes)
+- **13/06/2026:** Slug editable, testimonios/footer dinámicos, fix multi-tenancy storefront
+- 26/06/2026: Checkout como invitado
+- 26/06/2026: Dashboard admin con datos reales
+- 26/06/2026: Webhook MP multi-tenant
+- 25/06/2026: Retiro en local, transferencia bancaria
