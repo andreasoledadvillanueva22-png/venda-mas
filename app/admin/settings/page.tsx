@@ -20,6 +20,8 @@ import {
   verifyDomainDns,
 } from '@/lib/domain-verification'
 import { cn } from '@/lib/utils'
+import { isStoreSlugTaken, validateStoreSlug } from '@/lib/slug'
+import { StoreSlugField } from '@/components/admin/store-slug-field'
 import Link from 'next/link'
 
 type DbProfile = {
@@ -274,6 +276,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
   const storeId = formData.get('storeId')
   const fullName = formData.get('fullName')
   const storeName = formData.get('storeName')
+  const storeSlugRaw = formData.get('storeSlug')
   const description = formData.get('description')
   const logoUrl = formData.get('logoUrl')
   const primaryColor = formData.get('primaryColor')
@@ -289,6 +292,16 @@ export async function saveSettings(formData: FormData): Promise<void> {
 
   if (typeof storeName !== 'string' || !storeName.trim()) {
     redirect(`/admin/settings?error=${encodeURIComponent('El nombre de la tienda es obligatorio.')}`)
+  }
+
+  if (typeof storeSlugRaw !== 'string') {
+    redirect(`/admin/settings?error=${encodeURIComponent('El slug de la tienda es obligatorio.')}`)
+  }
+
+  const slugValidation = validateStoreSlug(storeSlugRaw)
+
+  if (!slugValidation.valid) {
+    redirect(`/admin/settings?error=${encodeURIComponent(slugValidation.error)}`)
   }
 
   if (typeof primaryColor !== 'string' || typeof secondaryColor !== 'string') {
@@ -317,7 +330,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
-    .select('id, owner_id')
+    .select('id, owner_id, slug')
     .eq('id', storeId)
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -326,9 +339,22 @@ export async function saveSettings(formData: FormData): Promise<void> {
     redirect(`/admin/settings?error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`)
   }
 
+  if (slugValidation.slug !== store.slug) {
+    const slugTaken = await isStoreSlugTaken(supabase, slugValidation.slug, store.id)
+
+    if (slugTaken) {
+      redirect(
+        `/admin/settings?error=${encodeURIComponent('Este slug ya está en uso. Probá con otro.')}`,
+      )
+    }
+  }
+
   const { error: profileError } = await supabase
     .from('profiles')
-    .update({ full_name: fullName.trim() })
+    .update({
+      full_name: fullName.trim(),
+      store_slug: slugValidation.slug,
+    })
     .eq('id', user.id)
 
   if (profileError) {
@@ -339,6 +365,7 @@ export async function saveSettings(formData: FormData): Promise<void> {
     .from('stores')
     .update({
       name: storeName.trim(),
+      slug: slugValidation.slug,
       description: parsedDescription,
       logo_url: parsedLogoUrl,
       primary_color: normalizedPrimaryColor,
@@ -348,10 +375,15 @@ export async function saveSettings(formData: FormData): Promise<void> {
     .eq('owner_id', user.id)
 
   if (storeUpdateError) {
-    redirect(`/admin/settings?error=${encodeURIComponent('No se pudo actualizar la tienda.')}`)
+    const message =
+      storeUpdateError.code === '23505'
+        ? 'Este slug ya está en uso. Probá con otro.'
+        : 'No se pudo actualizar la tienda.'
+    redirect(`/admin/settings?error=${encodeURIComponent(message)}`)
   }
 
   revalidatePath('/admin/settings')
+  revalidatePath('/storefront')
   redirect('/admin/settings?saved=1')
 }
 
@@ -1232,6 +1264,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     ? getDomainTxtValue(domainVerificationToken)
     : null
   const platformStorefrontUrl = `https://${process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'venda-mas.vercel.app'}/storefront?store=${encodeURIComponent(store.slug)}`
+  const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'venda-mas.vercel.app'
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1433,16 +1466,11 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="storeSlug">Slug de la tienda</Label>
-                  <Input
-                    id="storeSlug"
-                    name="storeSlug"
-                    value={store.slug}
-                    readOnly
-                    className="bg-muted font-mono text-muted-foreground"
-                  />
-                </div>
+                <StoreSlugField
+                  defaultSlug={store.slug}
+                  formId="settings-form"
+                  platformDomain={platformDomain}
+                />
               </div>
 
               <div className="space-y-2">
