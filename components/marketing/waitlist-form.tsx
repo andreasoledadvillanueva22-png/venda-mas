@@ -1,0 +1,109 @@
+'use client'
+
+import { useState } from 'react'
+import { Loader2, Mail } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { isValidWaitlistEmail } from '@/lib/waitlist'
+
+type WaitlistFormProps = {
+  className?: string
+  inputClassName?: string
+  buttonClassName?: string
+}
+
+export function WaitlistForm({
+  className = '',
+  inputClassName = '',
+  buttonClassName = '',
+}: WaitlistFormProps) {
+  const [email, setEmail] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [success, setSuccess] = useState('')
+  const [error, setError] = useState('')
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    setSuccess('')
+    setError('')
+
+    if (!isValidWaitlistEmail(email)) {
+      setError('Ingresá un email válido')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const response = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+
+      const data = (await response.json()) as { success?: boolean; error?: string }
+
+      if (!response.ok) {
+        setError(
+          data.error ?? 'Este email ya está registrado o hubo un error.',
+        )
+        return
+      }
+
+      setSuccess('¡Gracias! Te avisaremos cuando lancemos.')
+      setEmail('')
+    } catch {
+      setError('Este email ya está registrado o hubo un error.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className={className}>
+      <form onSubmit={(event) => void handleSubmit(event)} className="flex flex-col gap-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Mail className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <Input
+            type="email"
+            name="email"
+            autoComplete="email"
+            inputMode="email"
+            placeholder="tu@email.com"
+            value={email}
+            onChange={(event) => setEmail(event.target.value)}
+            disabled={loading}
+            required
+            className={`h-12 border-slate-300 bg-white pl-10 text-base ${inputClassName}`}
+          />
+        </div>
+        <Button
+          type="submit"
+          disabled={loading}
+          className={`h-12 bg-red-600 px-6 text-base font-semibold text-white hover:bg-red-700 ${buttonClassName}`}
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              Enviando...
+            </>
+          ) : (
+            'Unirme a la lista de espera'
+          )}
+        </Button>
+      </form>
+
+      {success ? (
+        <p className="mt-3 text-sm font-medium text-emerald-700" role="status">
+          {success}
+        </p>
+      ) : null}
+
+      {error ? (
+        <p className="mt-3 text-sm font-medium text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  )
+}
