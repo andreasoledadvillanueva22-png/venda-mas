@@ -7,9 +7,11 @@ import {
   Truck,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/server'
-import { resolveStorefrontStore } from '@/lib/storefront-server'
+import { resolveStorefrontStore, getProductReviews } from '@/lib/storefront-server'
 import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { BuyNowButton } from '@/components/storefront/buy-now-button'
+import { ProductVideo } from '@/components/storefront/product-video'
+import { ProductReviewsList } from '@/components/storefront/product-reviews-list'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -34,6 +36,7 @@ type DbProduct = {
   sku: string | null
   images: string[] | null
   tags: string[] | null
+  video_url: string | null
   featured: boolean
   active: boolean
 }
@@ -80,7 +83,7 @@ async function getProductDetail(
   let productQuery = supabase
     .from('products')
     .select(
-      'id, store_id, name, slug, description, price, compare_at_price, category, stock, sku, images, tags, featured, active',
+      'id, store_id, name, slug, description, price, compare_at_price, category, stock, sku, images, tags, video_url, featured, active',
     )
     .eq('id', productId)
     .eq('active', true)
@@ -158,6 +161,11 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
   const query = use(searchParams)
   const tenantStoreId = use(resolveStoreId(query.store))
   const detail = use(getProductDetail(id, tenantStoreId))
+  const reviews = use(
+    detail
+      ? getProductReviews(detail.product.id, detail.product.store_id)
+      : Promise.resolve([]),
+  )
 
   const selectedImageIndex = Math.max(0, Number(query.image ?? 0) || 0)
 
@@ -255,6 +263,15 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
                 ))}
               </div>
             )}
+
+            {product.video_url ? (
+              <div className="space-y-2">
+                <p className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
+                  Video del producto
+                </p>
+                <ProductVideo videoUrl={product.video_url} title={product.name} />
+              </div>
+            ) : null}
           </div>
 
           <div className="space-y-6">
@@ -365,6 +382,8 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
             </div>
           </div>
         </div>
+
+        <ProductReviewsList reviews={reviews} />
 
         {relatedProducts.length > 0 && (
           <div className="mt-16">

@@ -1,8 +1,8 @@
 import { headers } from 'next/headers'
-import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getStoreBySlug } from '@/lib/tenant'
 import type {
+  StorefrontProductReview,
   StorefrontRecentPurchase,
   StorefrontStore,
   StorefrontTestimonial,
@@ -178,61 +178,56 @@ function getCustomerFirstName(fullName: string): string {
   return firstName || 'Alguien'
 }
 
-function getMinutesAgo(isoDate: string): number {
-  const createdAt = new Date(isoDate).getTime()
-  if (Number.isNaN(createdAt)) {
-    return 0
-  }
-  return Math.max(0, Math.floor((Date.now() - createdAt) / 60_000))
-}
-
-function getProductNameFromOrderItem(
-  products: { name: string } | { name: string }[] | null,
-): string | null {
-  if (!products) {
-    return null
-  }
-  if (Array.isArray(products)) {
-    return products[0]?.name?.trim() || null
-  }
-  return products.name?.trim() || null
-}
-
 export async function getRecentPurchaseNotifications(
   storeId: string,
-  limit = 5,
+  limit = 10,
 ): Promise<StorefrontRecentPurchase[]> {
-  const admin = createAdminClient()
+  const supabase = await createClient()
 
-  const { data: orders, error } = await admin
-    .from('orders')
-    .select('customer_name, created_at, order_items(products(name))')
+  const { data: rows, error } = await supabase
+    .from('fake_purchase_notifications')
+    .select('id, customer_name, customer_city, product_name, minutes_ago')
     .eq('store_id', storeId)
-    .in('status', ['paid', 'shipped', 'delivered'])
+    .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error || !orders) {
+  if (error || !rows) {
     return []
   }
 
-  const notifications: StorefrontRecentPurchase[] = []
+  return rows.map((row) => ({
+    id: row.id,
+    customerFirstName: getCustomerFirstName(row.customer_name),
+    customerCity: row.customer_city.trim(),
+    productName: row.product_name.trim(),
+    minutesAgo: Math.max(1, Number(row.minutes_ago) || 5),
+  }))
+}
 
-  for (const order of orders) {
-    const items = order.order_items as Array<{ products: { name: string } | { name: string }[] | null }> | null
-    const firstItem = items?.[0]
-    const productName = firstItem ? getProductNameFromOrderItem(firstItem.products) : null
+export async function getProductReviews(
+  productId: string,
+  storeId: string,
+): Promise<StorefrontProductReview[]> {
+  const supabase = await createClient()
 
-    if (!productName || typeof order.customer_name !== 'string') {
-      continue
-    }
+  const { data: rows, error } = await supabase
+    .from('product_reviews')
+    .select('id, customer_name, rating, comment, source, source_url')
+    .eq('product_id', productId)
+    .eq('store_id', storeId)
+    .order('created_at', { ascending: false })
 
-    notifications.push({
-      customerFirstName: getCustomerFirstName(order.customer_name),
-      productName,
-      minutesAgo: getMinutesAgo(order.created_at as string),
-    })
+  if (error || !rows) {
+    return []
   }
 
-  return notifications
+  return rows.map((row) => ({
+    id: row.id,
+    customerName: row.customer_name,
+    rating: Number(row.rating ?? 5),
+    comment: row.comment,
+    source: row.source as StorefrontProductReview['source'],
+    sourceUrl: row.source_url?.trim() || null,
+  }))
 }

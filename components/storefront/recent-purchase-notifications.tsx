@@ -54,14 +54,15 @@ export function RecentPurchaseNotifications({ notifications }: RecentPurchaseNot
       <div className="pointer-events-none fixed bottom-6 left-4 z-40 h-28 w-[min(calc(100vw-2rem),20rem)] sm:left-6">
         {notifications.map((purchase, index) => (
           <div
-            key={`${purchase.customerFirstName}-${purchase.productName}-${index}`}
+            key={purchase.id}
             className="recent-purchase-notification pointer-events-none absolute inset-x-0 bottom-0 rounded-xl border border-slate-200 bg-white p-4 shadow-lg"
             style={{ animationDelay: `${index * POPUP_ROTATION_SECONDS}s` }}
           >
             <div className="flex items-start gap-3">
               <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-500" />
               <p className="text-sm leading-snug text-slate-700">
-                <span className="font-semibold text-slate-900">{purchase.customerFirstName}</span> compró{' '}
+                <span className="font-semibold text-slate-900">{purchase.customerFirstName}</span> de{' '}
+                <span className="font-semibold text-slate-900">{purchase.customerCity}</span> compró{' '}
                 <span className="font-semibold text-slate-900">{purchase.productName}</span> hace{' '}
                 {formatMinutesAgo(purchase.minutesAgo)}
               </p>

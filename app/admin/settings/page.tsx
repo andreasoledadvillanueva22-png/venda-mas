@@ -78,11 +78,22 @@ type DbTestimonial = {
   created_at: string
 }
 
+type DbFakePurchaseNotification = {
+  id: string
+  customer_name: string
+  customer_city: string
+  product_name: string
+  minutes_ago: number
+  is_active: boolean
+  created_at: string
+}
+
 type SettingsData = {
   email: string
   profile: DbProfile
   store: DbStore
   testimonials: DbTestimonial[]
+  fakePurchaseNotifications: DbFakePurchaseNotification[]
 }
 
 type SettingsPageProps = {
@@ -110,6 +121,9 @@ type SettingsPageProps = {
     testimonial_saved?: string
     testimonial_error?: string
     testimonial_deleted?: string
+    fake_notification_saved?: string
+    fake_notification_error?: string
+    fake_notification_deleted?: string
   }>
 }
 
@@ -118,6 +132,7 @@ const DEFAULT_SECONDARY_COLOR = '#16A34A'
 const DEFAULT_FREE_SHIPPING_THRESHOLD = 50000
 const DEFAULT_SHIPPING_STANDARD_COST = 5000
 const DEFAULT_SHIPPING_EXPRESS_COST = 8500
+const MAX_FAKE_PURCHASE_NOTIFICATIONS = 10
 
 function normalizeHexColor(value: string, fallback: string): string {
   const normalized = value.trim()
@@ -181,6 +196,14 @@ function parseOptionalText(value: FormDataEntryValue | null): string | null {
 
   const trimmed = value.trim()
   return trimmed || null
+}
+
+function parseFakeNotificationMinutes(value: FormDataEntryValue | null): number {
+  const parsed = Number(typeof value === 'string' ? value.trim() : '')
+  if (Number.isNaN(parsed) || parsed < 1) {
+    return 5
+  }
+  return Math.min(120, Math.floor(parsed))
 }
 
 function parseTestimonialRating(value: FormDataEntryValue | null): number {
@@ -263,11 +286,18 @@ async function getSettingsData(): Promise<SettingsData | null> {
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 
+  const { data: fakePurchaseNotifications } = await supabase
+    .from('fake_purchase_notifications')
+    .select('id, customer_name, customer_city, product_name, minutes_ago, is_active, created_at')
+    .eq('store_id', store.id)
+    .order('created_at', { ascending: false })
+
   return {
     email: user.email,
     profile: profile as DbProfile,
     store: store as DbStore,
     testimonials: (testimonials ?? []) as DbTestimonial[],
+    fakePurchaseNotifications: (fakePurchaseNotifications ?? []) as DbFakePurchaseNotification[],
   }
 }
 
@@ -598,6 +628,136 @@ export async function deleteTestimonial(formData: FormData): Promise<void> {
   revalidatePath('/admin/settings')
   revalidatePath('/storefront')
   redirect('/admin/settings?testimonial_deleted=1')
+}
+
+export async function saveFakePurchaseNotification(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const customerName = formData.get('customerName')
+  const customerCity = formData.get('customerCity')
+  const productName = formData.get('productName')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  if (typeof customerName !== 'string' || !customerName.trim()) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('El nombre del cliente es obligatorio.')}`,
+    )
+  }
+
+  if (typeof customerCity !== 'string' || !customerCity.trim()) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('La ciudad es obligatoria.')}`,
+    )
+  }
+
+  if (typeof productName !== 'string' || !productName.trim()) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('El nombre del producto es obligatorio.')}`,
+    )
+  }
+
+  const { supabase, user, store } = await verifyOwnedStore(storeId.trim())
+
+  if (!user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  if (!store) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { count, error: countError } = await supabase
+    .from('fake_purchase_notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('store_id', store.id)
+
+  if (countError) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo validar el límite de mensajes.')}`,
+    )
+  }
+
+  if ((count ?? 0) >= MAX_FAKE_PURCHASE_NOTIFICATIONS) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent(`Podés configurar hasta ${MAX_FAKE_PURCHASE_NOTIFICATIONS} mensajes ficticios.`)}`,
+    )
+  }
+
+  const isActive = formData.get('isActive') === 'on'
+
+  const { error: insertError } = await supabase.from('fake_purchase_notifications').insert({
+    store_id: store.id,
+    customer_name: customerName.trim(),
+    customer_city: customerCity.trim(),
+    product_name: productName.trim(),
+    minutes_ago: parseFakeNotificationMinutes(formData.get('minutesAgo')),
+    is_active: isActive,
+  })
+
+  if (insertError) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo guardar el mensaje ficticio.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront')
+  redirect('/admin/settings?fake_notification_saved=1')
+}
+
+export async function deleteFakePurchaseNotification(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const notificationId = formData.get('notificationId')
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  if (typeof notificationId !== 'string' || !notificationId.trim()) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo identificar el mensaje.')}`,
+    )
+  }
+
+  const { supabase, user, store } = await verifyOwnedStore(storeId.trim())
+
+  if (!user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  if (!store) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: deleteError } = await supabase
+    .from('fake_purchase_notifications')
+    .delete()
+    .eq('id', notificationId.trim())
+    .eq('store_id', store.id)
+
+  if (deleteError) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo eliminar el mensaje ficticio.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront')
+  redirect('/admin/settings?fake_notification_deleted=1')
 }
 
 export async function saveMercadoPagoCredentials(formData: FormData): Promise<void> {
@@ -1242,6 +1402,9 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     testimonial_saved,
     testimonial_error,
     testimonial_deleted,
+    fake_notification_saved,
+    fake_notification_error,
+    fake_notification_deleted,
   } = await searchParams
   const settings = await getSettingsData()
 
@@ -1249,7 +1412,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     redirect('/auth/login?redirect=/admin/settings')
   }
 
-  const { email, profile, store, testimonials } = settings
+  const { email, profile, store, testimonials, fakePurchaseNotifications } = settings
   const primaryColor = store.primary_color ?? DEFAULT_PRIMARY_COLOR
   const secondaryColor = store.secondary_color ?? DEFAULT_SECONDARY_COLOR
   const hasMercadoPagoCredentials = Boolean(store.mp_access_token && store.mp_public_key)
@@ -1679,6 +1842,145 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
                   Guardar footer
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Pop-ups de urgencia ficticios</CardTitle>
+              <CardDescription>
+                Mensajes de compra reciente que rotan en tu tienda. Máximo{' '}
+                {MAX_FAKE_PURCHASE_NOTIFICATIONS} mensajes. Si no hay mensajes activos, el pop-up no
+                se muestra.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {fake_notification_saved === '1' ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  Mensaje ficticio guardado
+                </div>
+              ) : null}
+
+              {fake_notification_deleted === '1' ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                  Mensaje ficticio eliminado
+                </div>
+              ) : null}
+
+              {fake_notification_error ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {fake_notification_error}
+                </div>
+              ) : null}
+
+              {fakePurchaseNotifications.length > 0 ? (
+                <div className="space-y-3">
+                  {fakePurchaseNotifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-start sm:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <p className="font-semibold text-foreground">
+                          {notification.customer_name} de {notification.customer_city}
+                        </p>
+                        <p className="text-sm text-foreground">
+                          Compró <span className="font-medium">{notification.product_name}</span> hace{' '}
+                          {notification.minutes_ago}{' '}
+                          {notification.minutes_ago === 1 ? 'minuto' : 'minutos'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {notification.is_active ? 'Activo' : 'Inactivo'}
+                        </p>
+                      </div>
+                      <form action={deleteFakePurchaseNotification}>
+                        <input type="hidden" name="storeId" value={store.id} />
+                        <input type="hidden" name="notificationId" value={notification.id} />
+                        <Button type="submit" variant="outline" size="sm">
+                          Eliminar
+                        </Button>
+                      </form>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Todavía no configuraste mensajes ficticios de compra.
+                </p>
+              )}
+
+              {fakePurchaseNotifications.length < MAX_FAKE_PURCHASE_NOTIFICATIONS ? (
+                <form
+                  action={saveFakePurchaseNotification}
+                  className="space-y-4 border-t border-border pt-6"
+                >
+                  <input type="hidden" name="storeId" value={store.id} />
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="fakeCustomerName">Nombre del cliente</Label>
+                      <Input
+                        id="fakeCustomerName"
+                        name="customerName"
+                        placeholder="Ej. María"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fakeCustomerCity">Ciudad</Label>
+                      <Input
+                        id="fakeCustomerCity"
+                        name="customerCity"
+                        placeholder="Ej. Córdoba"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="fakeProductName">Producto comprado</Label>
+                      <Input
+                        id="fakeProductName"
+                        name="productName"
+                        placeholder="Ej. Remera básica"
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="fakeMinutesAgo">Hace cuántos minutos</Label>
+                      <Input
+                        id="fakeMinutesAgo"
+                        name="minutesAgo"
+                        type="number"
+                        min={1}
+                        max={120}
+                        defaultValue={5}
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <Label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      name="isActive"
+                      defaultChecked
+                      className="h-4 w-4 rounded border border-input text-red-600 focus:ring-red-500"
+                    />
+                    Mensaje activo (visible en la tienda)
+                  </Label>
+
+                  <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                    Agregar mensaje ficticio
+                  </Button>
+                </form>
+              ) : (
+                <p className="border-t border-border pt-6 text-sm text-muted-foreground">
+                  Alcanzaste el máximo de {MAX_FAKE_PURCHASE_NOTIFICATIONS} mensajes. Eliminá uno para
+                  agregar otro.
+                </p>
+              )}
             </CardContent>
           </Card>
 

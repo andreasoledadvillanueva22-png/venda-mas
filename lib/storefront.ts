@@ -16,9 +16,20 @@ export type StorefrontStore = {
 }
 
 export type StorefrontRecentPurchase = {
+  id: string
   customerFirstName: string
+  customerCity: string
   productName: string
   minutesAgo: number
+}
+
+export type StorefrontProductReview = {
+  id: string
+  customerName: string
+  rating: number
+  comment: string
+  source: 'mercadolibre' | 'amazon' | 'aliexpress' | 'manual'
+  sourceUrl: string | null
 }
 
 export const DEFAULT_STOREFRONT_FAVICON = '/icon.svg'

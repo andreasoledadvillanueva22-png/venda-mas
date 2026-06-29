@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import { isValidVideoUrl } from '@/lib/video'
+import { ProductReviewsManager } from '@/components/admin/product-reviews-manager'
 
 const MAX_IMAGES = 5
 
@@ -22,6 +24,7 @@ type ProductFormState = {
   stock: string
   sku: string
   tags: string
+  videoUrl: string
   featured: boolean
   active: boolean
 }
@@ -45,6 +48,7 @@ type DbProduct = {
   sku: string | null
   images: string[] | null
   tags: string[] | null
+  video_url: string | null
   featured: boolean
   active: boolean
 }
@@ -184,6 +188,7 @@ function NewProductPageContent() {
     stock: '0',
     sku: '',
     tags: '',
+    videoUrl: '',
     featured: false,
     active: true,
   })
@@ -250,7 +255,7 @@ function NewProductPageContent() {
       const { data: product, error: productError } = await supabase
         .from('products')
         .select(
-          'id, store_id, name, slug, description, price, compare_at_price, category, stock, sku, images, tags, featured, active',
+          'id, store_id, name, slug, description, price, compare_at_price, category, stock, sku, images, tags, video_url, featured, active',
         )
         .eq('id', editProductId)
         .eq('store_id', storeId)
@@ -278,6 +283,7 @@ function NewProductPageContent() {
         stock: String(dbProduct.stock),
         sku: dbProduct.sku ?? '',
         tags: (dbProduct.tags ?? []).join(', '),
+        videoUrl: dbProduct.video_url ?? '',
         featured: dbProduct.featured,
         active: dbProduct.active,
       })
@@ -377,6 +383,10 @@ function NewProductPageContent() {
       }
     }
 
+    if (form.videoUrl.trim() && !isValidVideoUrl(form.videoUrl)) {
+      nextErrors.videoUrl = 'Ingresá una URL válida de YouTube, Vimeo o un archivo MP4.'
+    }
+
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -439,6 +449,7 @@ function NewProductPageContent() {
         sku: form.sku.trim() || null,
         images: imageUrls,
         tags,
+        video_url: form.videoUrl.trim() || null,
         featured: form.featured,
         active: form.active,
       }
@@ -680,6 +691,25 @@ function NewProductPageContent() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="videoUrl">Video del producto (opcional)</Label>
+                  <Input
+                    id="videoUrl"
+                    value={form.videoUrl}
+                    onChange={(event) => handleFieldChange('videoUrl', event.target.value)}
+                    placeholder="https://www.youtube.com/watch?v=... o https://vimeo.com/..."
+                    disabled={submitting}
+                    className={fieldErrorClass(errors.videoUrl)}
+                  />
+                  {errors.videoUrl ? (
+                    <p className="text-sm text-destructive">{errors.videoUrl}</p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      YouTube, Vimeo o enlace directo a MP4/WebM.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="slug-preview">Slug (automático)</Label>
                   <Input id="slug-preview" value={slugPreview} readOnly disabled className="bg-slate-50" />
                   <p className="text-sm text-muted-foreground">
@@ -819,6 +849,10 @@ function NewProductPageContent() {
                 </div>
               </CardContent>
             </Card>
+
+            {isEditMode && storeId && editProductId ? (
+              <ProductReviewsManager storeId={storeId} productId={editProductId} />
+            ) : null}
           </div>
         </div>
       </form>
