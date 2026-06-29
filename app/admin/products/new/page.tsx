@@ -12,6 +12,11 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { isValidVideoUrl } from '@/lib/video'
 import { ProductReviewsManager } from '@/components/admin/product-reviews-manager'
+import { RichTextEditor } from '@/components/admin/rich-text-editor'
+import {
+  isEmptyProductDescription,
+  MAX_PRODUCT_DESCRIPTION_HTML_LENGTH,
+} from '@/lib/product-description'
 
 const MAX_IMAGES = 5
 
@@ -387,6 +392,10 @@ function NewProductPageContent() {
       nextErrors.videoUrl = 'Ingresá una URL válida de YouTube, Vimeo o un archivo MP4.'
     }
 
+    if (form.description.length > MAX_PRODUCT_DESCRIPTION_HTML_LENGTH) {
+      nextErrors.description = `La descripción no puede superar ${MAX_PRODUCT_DESCRIPTION_HTML_LENGTH} caracteres HTML.`
+    }
+
     setErrors(nextErrors)
     return Object.keys(nextErrors).length === 0
   }
@@ -441,7 +450,7 @@ function NewProductPageContent() {
       const productPayload = {
         name: form.name.trim(),
         slug,
-        description: form.description.trim() || null,
+        description: isEmptyProductDescription(form.description) ? null : form.description.trim(),
         price: Number(form.price),
         compare_at_price: form.comparePrice.trim() ? Number(form.comparePrice) : null,
         category: form.category.trim() || null,
@@ -592,16 +601,15 @@ function NewProductPageContent() {
 
                 <div className="space-y-2">
                   <Label htmlFor="description">Descripción</Label>
-                  <textarea
-                    id="description"
+                  <RichTextEditor
                     value={form.description}
-                    onChange={(event) => handleFieldChange('description', event.target.value)}
-                    placeholder="Describe el producto con sus beneficios y usos"
-                    maxLength={2000}
+                    onChange={(html) => handleFieldChange('description', html)}
                     disabled={submitting}
-                    className="min-h-[140px] w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-ring/50"
+                    placeholder="Describe el producto con sus beneficios y usos"
                   />
-                  <p className="text-sm text-muted-foreground">{form.description.length}/2000 caracteres</p>
+                  {errors.description && (
+                    <p className="text-sm text-destructive">{errors.description}</p>
+                  )}
                 </div>
 
                 <div className="space-y-2">

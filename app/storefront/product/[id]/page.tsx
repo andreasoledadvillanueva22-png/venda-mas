@@ -1,5 +1,6 @@
 import { use } from 'react'
 import Link from 'next/link'
+import type { Metadata } from 'next'
 import {
   ChevronRight,
   RotateCcw,
@@ -12,10 +13,19 @@ import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { BuyNowButton } from '@/components/storefront/buy-now-button'
 import { ProductVideo } from '@/components/storefront/product-video'
 import { ProductReviewsList } from '@/components/storefront/product-reviews-list'
+import { ShareProductButton } from '@/components/storefront/share-product-button'
+import { ProductDescription } from '@/components/storefront/product-description'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Separator } from '@/components/ui/separator'
+import {
+  buildProductShareUrl,
+  formatSharePrice,
+  toAbsoluteMediaUrl,
+} from '@/lib/share-product'
+import { getStorefrontOrigin } from '@/lib/share-product-server'
+import { getProductDescriptionExcerpt } from '@/lib/product-description'
 import { cn } from '@/lib/utils'
 
 type ProductPageProps = {
@@ -51,6 +61,8 @@ type RelatedProduct = {
 type ProductDetail = {
   product: DbProduct
   relatedProducts: RelatedProduct[]
+  storeName: string
+  storeSlug: string | null
 }
 
 function formatPrice(value: number) {
@@ -102,13 +114,16 @@ async function getProductDetail(
 
   const { data: store, error: storeError } = await supabase
     .from('stores')
-    .select('id')
+    .select('id, name, slug')
     .eq('id', dbProduct.store_id)
     .maybeSingle()
 
   if (storeError || !store) {
     return null
   }
+
+  const storeName = store.name
+  const storeSlug = store.slug
 
   let relatedProducts: RelatedProduct[] = []
 
@@ -136,6 +151,8 @@ async function getProductDetail(
   return {
     product: dbProduct,
     relatedProducts,
+    storeName,
+    storeSlug,
   }
 }
 
@@ -154,6 +171,64 @@ function buildProductPath(productId: string, storeSlug?: string, imageIndex?: nu
   return query
     ? `/storefront/product/${productId}?${query}`
     : `/storefront/product/${productId}`
+}
+
+function buildProductDescription(description: string | null, productName: string): string {
+  const excerpt = getProductDescriptionExcerpt(description, 160)
+  if (excerpt) {
+    return excerpt
+  }
+  return `Comprá ${productName} online con envío a toda Argentina.`
+}
+
+export async function generateMetadata({ params, searchParams }: ProductPageProps): Promise<Metadata> {
+  const { id } = await params
+  const query = await searchParams
+  const tenantStoreId = await resolveStoreId(query.store)
+  const detail = await getProductDetail(id, tenantStoreId)
+
+  if (!detail) {
+    return {
+      title: 'Producto no disponible',
+    }
+  }
+
+  const { product, storeName } = detail
+  const storeSlug = query.store ?? detail.storeSlug
+  const origin = await getStorefrontOrigin()
+  const shareUrl = buildProductShareUrl(origin, product.id, storeSlug)
+  const description = buildProductDescription(product.description, product.name)
+  const ogImageRaw = product.images?.[0]
+  const ogImage = ogImageRaw ? toAbsoluteMediaUrl(ogImageRaw, origin) : undefined
+  const formattedPrice = formatSharePrice(Number(product.price))
+
+  return {
+    title: `${product.name} | ${storeName}`,
+    description,
+    openGraph: {
+      title: product.name,
+      description: `${formattedPrice} · ${description}`,
+      url: shareUrl,
+      siteName: storeName,
+      type: 'website',
+      locale: 'es_AR',
+      ...(ogImage ? { images: [{ url: ogImage, alt: product.name }] } : {}),
+    },
+    twitter: {
+      card: ogImage ? 'summary_large_image' : 'summary',
+      title: product.name,
+      description: `${formattedPrice} · ${description}`,
+      ...(ogImage ? { images: [ogImage] } : {}),
+    },
+  }
+}
+
+async function getProductShareUrl(
+  productId: string,
+  storeSlug: string | null | undefined,
+): Promise<string> {
+  const origin = await getStorefrontOrigin()
+  return buildProductShareUrl(origin, productId, storeSlug)
 }
 
 export default function ProductPage({ params, searchParams }: ProductPageProps) {
@@ -192,7 +267,9 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
     )
   }
 
-  const { product, relatedProducts } = detail
+  const { product, relatedProducts, storeName } = detail
+  const shareUrl = use(getProductShareUrl(product.id, query.store ?? detail.storeSlug))
+  const formattedSharePrice = formatSharePrice(Number(product.price))
   const images = product.images ?? []
   const safeImageIndex =
     images.length > 0 ? Math.min(selectedImageIndex, images.length - 1) : 0
@@ -311,7 +388,7 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
             </div>
 
             {product.description && (
-              <p className="text-muted-foreground">{product.description}</p>
+              <ProductDescription html={product.description} />
             )}
 
             <Separator />
@@ -361,6 +438,12 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
                 productImage={mainImage ?? ''}
                 stock={product.stock}
                 storeSlug={query.store ?? null}
+              />
+              <ShareProductButton
+                productName={product.name}
+                formattedPrice={formattedSharePrice}
+                storeName={storeName}
+                shareUrl={shareUrl}
               />
             </div>
 

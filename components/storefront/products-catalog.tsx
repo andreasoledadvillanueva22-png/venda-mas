@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Search, ShoppingCart, Filter, X } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
 import { storefrontHref } from '@/lib/storefront'
+import { stripHtmlToPlainText } from '@/lib/product-description'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -297,7 +298,7 @@ export function ProductsCatalog({
                             {product.name}
                           </h3>
                           <p className="mb-3 line-clamp-2 text-sm text-muted-foreground">
-                            {product.description}
+                            {stripHtmlToPlainText(product.description)}
                           </p>
                         </div>
                       </Link>

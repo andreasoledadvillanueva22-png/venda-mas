@@ -19,6 +19,7 @@ import {
 } from '@/lib/storefront-server'
 import type { StorefrontTestimonial } from '@/lib/storefront'
 import { buildWhatsappUrl, storefrontHref } from '@/lib/storefront'
+import { stripHtmlToPlainText } from '@/lib/product-description'
 
 const BRAND_RED = '#FC0303'
 
@@ -374,7 +375,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                             {product.name}
                           </h3>
                           <p className="mb-3 line-clamp-2 text-sm text-slate-500">
-                            {product.description}
+                            {stripHtmlToPlainText(product.description)}
                           </p>
                         </div>
                       </Link>
