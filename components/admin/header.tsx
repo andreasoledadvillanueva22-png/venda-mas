@@ -1,7 +1,9 @@
 'use client'
 
+import Link from 'next/link'
 import { Bell, HelpCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { Logo } from '@/components/ui/logo'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +12,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import Link from 'next/link'
 
 interface AdminHeaderProps {
   storeName: string
@@ -23,6 +24,10 @@ export function AdminHeader({ storeName, storeDomain, storeSlug, initials }: Adm
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex items-center gap-3">
+        <Link href="/admin" className="shrink-0">
+          <Logo size="sm" />
+        </Link>
+        <div className="hidden h-6 w-px bg-border sm:block" aria-hidden="true" />
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
           <span className="text-xs font-bold text-primary-foreground">{initials}</span>
         </div>

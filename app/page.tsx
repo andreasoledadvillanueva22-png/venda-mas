@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Rocket, Smartphone, CreditCard } from 'lucide-react'
 import { WaitlistForm } from '@/components/marketing/waitlist-form'
+import { Logo } from '@/components/ui/logo'
 
 export const metadata: Metadata = {
   title: 'VendaMás — Vendé online en minutos',
@@ -45,8 +46,8 @@ export default function LandingPage() {
 
       <header className="relative z-10 border-b border-white/10 bg-white/5 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="text-xl font-bold tracking-tight text-white">
-            VendaMás
+          <Link href="/" className="inline-flex rounded-lg bg-white/95 px-2 py-1 shadow-sm">
+            <Logo size="md" priority />
           </Link>
           <Link
             href="/auth/login"

@@ -7,6 +7,7 @@ import type { StorefrontRecentPurchase, StorefrontStore } from '@/lib/storefront
 import { buildWhatsappUrl, normalizeSocialUrl, storefrontHref } from '@/lib/storefront'
 import { FloatingWhatsappButton } from '@/components/storefront/floating-whatsapp-button'
 import { RecentPurchaseNotifications } from '@/components/storefront/recent-purchase-notifications'
+import { Logo } from '@/components/ui/logo'
 
 type StorefrontShellProps = {
   store: StorefrontStore | null
@@ -233,7 +234,10 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
               </div>
             ) : null}
           </div>
-          <div className="mt-8 border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
+          <div className="mt-8 flex items-center justify-center gap-1 text-center text-sm text-gray-500">
+            Powered by <Logo size="xs" className="inline" />
+          </div>
+          <div className="mt-4 border-t border-slate-800 pt-8 text-center text-sm text-slate-400">
             © {new Date().getFullYear()} {storeName}. Todos los derechos reservados.
           </div>
         </div>
