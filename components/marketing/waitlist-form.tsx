@@ -5,17 +5,20 @@ import { Loader2, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { isValidWaitlistEmail } from '@/lib/waitlist'
+import { cn } from '@/lib/utils'
 
 type WaitlistFormProps = {
   className?: string
   inputClassName?: string
   buttonClassName?: string
+  iconClassName?: string
 }
 
 export function WaitlistForm({
-  className = '',
-  inputClassName = '',
-  buttonClassName = '',
+  className,
+  inputClassName,
+  buttonClassName,
+  iconClassName,
 }: WaitlistFormProps) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -44,9 +47,7 @@ export function WaitlistForm({
       const data = (await response.json()) as { success?: boolean; error?: string }
 
       if (!response.ok) {
-        setError(
-          data.error ?? 'Este email ya está registrado o hubo un error.',
-        )
+        setError(data.error ?? 'Este email ya está registrado o hubo un error.')
         return
       }
 
@@ -63,7 +64,12 @@ export function WaitlistForm({
     <div className={className}>
       <form onSubmit={(event) => void handleSubmit(event)} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <Mail className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+          <Mail
+            className={cn(
+              'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/70',
+              iconClassName,
+            )}
+          />
           <Input
             type="email"
             name="email"
@@ -74,13 +80,19 @@ export function WaitlistForm({
             onChange={(event) => setEmail(event.target.value)}
             disabled={loading}
             required
-            className={`h-12 border-slate-300 bg-white pl-10 text-base ${inputClassName}`}
+            className={cn(
+              'h-12 border-white/30 bg-white/20 pl-10 text-base text-white placeholder:text-white/70 focus-visible:border-white/50 focus-visible:ring-white/20',
+              inputClassName,
+            )}
           />
         </div>
         <Button
           type="submit"
           disabled={loading}
-          className={`h-12 bg-red-600 px-6 text-base font-semibold text-white hover:bg-red-700 ${buttonClassName}`}
+          className={cn(
+            'h-12 bg-white px-6 text-base font-semibold text-brand-700 hover:bg-brand-50',
+            buttonClassName,
+          )}
         >
           {loading ? (
             <>
@@ -94,13 +106,19 @@ export function WaitlistForm({
       </form>
 
       {success ? (
-        <p className="mt-3 text-sm font-medium text-emerald-700" role="status">
+        <p
+          className="mt-3 rounded-lg border border-emerald-400/30 bg-emerald-500/20 px-3 py-2 text-sm font-medium text-white"
+          role="status"
+        >
           {success}
         </p>
       ) : null}
 
       {error ? (
-        <p className="mt-3 text-sm font-medium text-red-600" role="alert">
+        <p
+          className="mt-3 rounded-lg border border-red-400/30 bg-red-500/20 px-3 py-2 text-sm font-medium text-white"
+          role="alert"
+        >
           {error}
         </p>
       ) : null}
