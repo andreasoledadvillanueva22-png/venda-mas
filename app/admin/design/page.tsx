@@ -76,14 +76,14 @@ export default function AdminDesignPage() {
   const currentTheme = themes.find((theme) => theme.id === selectedTheme)
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-border bg-white px-6 py-6">
+    <div className="min-h-full">
+      <div className="border-b border-brand-200 bg-white/60 px-6 py-6 backdrop-blur-md">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground">Diseño de la tienda</h1>
-            <p className="text-sm text-muted-foreground">Personaliza el aspecto de tu tienda y su tipografía.</p>
+            <h1 className="text-3xl font-bold text-brand-900">Diseño de la tienda</h1>
+            <p className="text-sm text-brand-600">Personaliza el aspecto de tu tienda y su tipografía.</p>
           </div>
-          <Button className="bg-red-600 text-white hover:bg-red-700" onClick={() => setShowPreview(true)}>
+          <Button onClick={() => setShowPreview(true)}>
             <Eye className="mr-2 h-4 w-4" /> Vista previa
           </Button>
         </div>
@@ -136,8 +136,8 @@ export default function AdminDesignPage() {
                           </div>
                           <div className="mt-4">
                             <Button
-                              variant={selectedTheme === theme.id ? undefined : 'outline'}
-                              className={`w-full ${selectedTheme === theme.id ? 'bg-red-600 text-white hover:bg-red-700' : ''}`}
+                              variant={selectedTheme === theme.id ? 'default' : 'secondary'}
+                              className="w-full"
                               onClick={(event) => {
                                 event.stopPropagation()
                                 setSelectedTheme(theme.id)
@@ -546,7 +546,7 @@ export default function AdminDesignPage() {
               <Button variant="outline" onClick={() => setShowHeroModal(false)}>
                 Cancelar
               </Button>
-              <Button onClick={() => setShowHeroModal(false)} className="bg-red-600 text-white hover:bg-red-700">
+              <Button onClick={() => setShowHeroModal(false)}>
                 Guardar
               </Button>
             </div>

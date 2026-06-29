@@ -348,17 +348,17 @@ export default async function AdminMarketingPage() {
   const activeDiscountsCount = discounts.filter((discount) => discount.active).length
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-border bg-white px-6 py-6">
+    <div className="min-h-full">
+      <div className="border-b border-brand-200 bg-white/60 px-6 py-6 backdrop-blur-md">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-semibold text-foreground">Marketing</h1>
-              <Badge className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">
+              <h1 className="text-3xl font-bold text-brand-900">Marketing</h1>
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-sm font-semibold">
                 {discounts.length}
               </Badge>
             </div>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-sm text-brand-600">
               Gestioná los códigos de descuento de tu tienda.
             </p>
           </div>

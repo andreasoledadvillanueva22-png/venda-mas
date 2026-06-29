@@ -24,6 +24,17 @@ import {
 } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { useCart } from '@/lib/cart-context'
+import { CheckoutSteps } from '@/components/storefront/checkout-steps'
+import {
+  checkoutCardClassName,
+  checkoutHeaderClassName,
+  checkoutLabelClassName,
+  checkoutOptionClassName,
+  checkoutPageClassName,
+  checkoutStateCardClassName,
+  checkoutSummaryClassName,
+  checkoutTextareaClassName,
+} from '@/lib/checkout-styles'
 import { createClient } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -137,7 +148,7 @@ function BankTransferDetails({ bankDetails }: { bankDetails: BankDetailsConfig }
   }
 
   return (
-    <div className="space-y-4 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+    <div className="space-y-4 rounded-xl border border-brand-100 bg-brand-50/50 p-4 text-sm text-gray-700">
       <div>
         <p className="font-semibold text-slate-900">Datos para transferir</p>
         <p className="mt-2 text-slate-600">
@@ -160,7 +171,7 @@ function BankTransferDetails({ bankDetails }: { bankDetails: BankDetailsConfig }
         </p>
       </div>
 
-      <div className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+      <div className="space-y-3 rounded-xl border border-brand-200 bg-white p-3">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <p>
             <span className="font-semibold text-slate-900">CBU: </span>
@@ -663,11 +674,11 @@ export default function CheckoutPage() {
 
   if (storeLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <Card className="w-full max-w-md">
+      <div className={`flex min-h-screen items-center justify-center px-4 ${checkoutPageClassName}`}>
+        <Card className={checkoutStateCardClassName}>
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-red-600" />
-            <p className="text-sm text-slate-500">Cargando checkout...</p>
+            <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
+            <p className="text-sm text-brand-600">Cargando checkout...</p>
           </CardContent>
         </Card>
       </div>
@@ -676,17 +687,15 @@ export default function CheckoutPage() {
 
   if (items.length === 0) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <Card className="w-full max-w-md">
+      <div className={`flex min-h-screen items-center justify-center px-4 ${checkoutPageClassName}`}>
+        <Card className={checkoutStateCardClassName}>
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <p className="text-lg font-semibold text-slate-900">Tu carrito está vacío</p>
-            <p className="text-center text-sm text-slate-500">
+            <p className="text-lg font-semibold text-brand-900">Tu carrito está vacío</p>
+            <p className="text-center text-sm text-brand-600">
               No hay productos para comprar. Volvé a la tienda para agregar productos.
             </p>
             <Link href="/storefront/products">
-              <Button className="mt-4 bg-red-600 text-white hover:bg-red-700">
-                Ir a productos
-              </Button>
+              <Button className="mt-4 rounded-xl">Ir a productos</Button>
             </Link>
           </CardContent>
         </Card>
@@ -700,13 +709,13 @@ export default function CheckoutPage() {
       : null
 
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
-        <Card className="w-full max-w-md">
+      <div className={`flex min-h-screen items-center justify-center px-4 ${checkoutPageClassName}`}>
+        <Card className={checkoutStateCardClassName}>
           <CardContent className="flex flex-col items-center gap-4 py-12">
-            <p className="text-lg font-semibold text-slate-900">
+            <p className="text-lg font-semibold text-brand-900">
               No pudimos identificar la tienda
             </p>
-            <p className="text-center text-sm text-slate-500">
+            <p className="text-center text-sm text-brand-600">
               Volvé al catálogo, agregá productos al carrito e intentá nuevamente.
             </p>
             <Link
@@ -716,14 +725,9 @@ export default function CheckoutPage() {
                   : '/storefront/products'
               }
             >
-              <Button className="mt-2 bg-red-600 text-white hover:bg-red-700">
-                Ir al catálogo
-              </Button>
+              <Button className="mt-2 rounded-xl">Ir al catálogo</Button>
             </Link>
-            <Link
-              href="/storefront/cart"
-              className="text-sm text-red-600 hover:text-red-700"
-            >
+            <Link href="/storefront/cart" className="text-sm font-medium text-brand-600 hover:text-brand-700">
               Volver al carrito
             </Link>
           </CardContent>
@@ -895,26 +899,25 @@ export default function CheckoutPage() {
   const checkoutTitle = `${storeName?.trim() || 'Tu Tienda'} - Checkout`
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-slate-200 bg-white px-4 py-6 sm:px-6">
+    <div className={checkoutPageClassName}>
+      <div className={checkoutHeaderClassName}>
         <div className="mx-auto max-w-7xl">
           <Link
             href="/storefront/cart"
-            className="inline-flex items-center gap-2 text-sm text-red-600 hover:text-red-700"
+            className="inline-flex items-center gap-2 text-sm font-medium text-brand-600 hover:text-brand-700"
           >
             <ArrowLeft className="h-4 w-4" />
             Volver al carrito
           </Link>
-          <div className="mt-4 flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 font-semibold text-red-600">
-              F
-            </div>
-            <h1 className="text-2xl font-semibold text-slate-950">{checkoutTitle}</h1>
+          <div className="mt-4">
+            <h1 className="text-2xl font-bold text-brand-900">{checkoutTitle}</h1>
+            <p className="mt-1 text-sm text-brand-600">Completá tus datos para finalizar la compra</p>
           </div>
         </div>
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <CheckoutSteps className="mb-8" />
         {submitError && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
             {submitError}
@@ -929,7 +932,7 @@ export default function CheckoutPage() {
                 type="button"
                 onClick={handleRetryPayment}
                 disabled={submitting}
-                className="mt-4 bg-red-600 text-white hover:bg-red-700"
+                className="mt-4 rounded-xl"
               >
                 {submitting ? 'Reintentando...' : 'Reintentar pago'}
               </Button>
@@ -939,17 +942,17 @@ export default function CheckoutPage() {
 
         <div className="grid gap-8 lg:grid-cols-[1fr_380px]">
           <form onSubmit={handleSubmit} className="space-y-8">
-            <Card className="rounded-[2rem]">
+            <Card className={checkoutCardClassName}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Mail className="h-5 w-5 text-red-600" />
+                  <Mail className="h-5 w-5 text-brand-600" />
                   Datos de contacto
                 </CardTitle>
                 <p className="text-sm text-muted-foreground">
                   Comprá sin crear cuenta.{' '}
                   <Link
                     href={`/auth/login?redirect=${encodeURIComponent('/storefront/checkout')}`}
-                    className="font-medium text-red-600 hover:text-red-700"
+                    className="font-medium text-brand-600 hover:text-brand-700"
                   >
                     ¿Ya tenés cuenta? Iniciá sesión
                   </Link>
@@ -957,7 +960,7 @@ export default function CheckoutPage() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email" className={checkoutLabelClassName}>Email *</Label>
                   <Input
                     id="email"
                     type="email"
@@ -970,7 +973,7 @@ export default function CheckoutPage() {
                   {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
                 </div>
                 <div>
-                  <Label htmlFor="phone">Teléfono/WhatsApp *</Label>
+                  <Label htmlFor="phone" className={checkoutLabelClassName}>Teléfono/WhatsApp *</Label>
                   <Input
                     id="phone"
                     type="tel"
@@ -984,7 +987,7 @@ export default function CheckoutPage() {
                 </div>
                 {isLocalPickup ? (
                   <div>
-                    <Label htmlFor="nombre">Nombre completo *</Label>
+                    <Label htmlFor="nombre" className={checkoutLabelClassName}>Nombre completo *</Label>
                     <Input
                       id="nombre"
                       placeholder="Juan Pérez"
@@ -1014,14 +1017,14 @@ export default function CheckoutPage() {
             </Card>
 
             {isLocalPickup ? (
-              <Card className="rounded-[2rem]">
+              <Card className={checkoutCardClassName}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Store className="h-5 w-5 text-red-600" />
+                    <Store className="h-5 w-5 text-brand-600" />
                     Retiro en local
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-3 rounded-lg bg-slate-50 p-4 text-sm text-slate-700">
+                <CardContent className="space-y-3 rounded-xl border border-brand-100 bg-brand-50/50 p-4 text-sm text-gray-700">
                   {localPickupConfig.address ? (
                     <p>
                       <span className="font-semibold text-slate-900">Dirección: </span>
@@ -1043,16 +1046,16 @@ export default function CheckoutPage() {
                 </CardContent>
               </Card>
             ) : (
-              <Card className="rounded-[2rem]">
+              <Card className={checkoutCardClassName}>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <MapPin className="h-5 w-5 text-red-600" />
+                    <MapPin className="h-5 w-5 text-brand-600" />
                     Dirección de envío
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div>
-                    <Label htmlFor="nombre">Nombre completo *</Label>
+                    <Label htmlFor="nombre" className={checkoutLabelClassName}>Nombre completo *</Label>
                     <Input
                       id="nombre"
                       placeholder="Juan Pérez"
@@ -1064,7 +1067,7 @@ export default function CheckoutPage() {
                     {errors.nombre && <p className="mt-1 text-xs text-red-600">{errors.nombre}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="dni">DNI (opcional)</Label>
+                    <Label htmlFor="dni" className={checkoutLabelClassName}>DNI (opcional)</Label>
                     <Input
                       id="dni"
                       placeholder="12.345.678"
@@ -1075,7 +1078,7 @@ export default function CheckoutPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="calle">Calle y número *</Label>
+                    <Label htmlFor="calle" className={checkoutLabelClassName}>Calle y número *</Label>
                     <Input
                       id="calle"
                       placeholder="Av. Libertador 1234"
@@ -1087,7 +1090,7 @@ export default function CheckoutPage() {
                     {errors.calle && <p className="mt-1 text-xs text-red-600">{errors.calle}</p>}
                   </div>
                   <div>
-                    <Label htmlFor="piso">Piso/Departamento (opcional)</Label>
+                    <Label htmlFor="piso" className={checkoutLabelClassName}>Piso/Departamento (opcional)</Label>
                     <Input
                       id="piso"
                       placeholder="5° B"
@@ -1099,7 +1102,7 @@ export default function CheckoutPage() {
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                      <Label htmlFor="ciudad">Ciudad *</Label>
+                      <Label htmlFor="ciudad" className={checkoutLabelClassName}>Ciudad *</Label>
                       <Input
                         id="ciudad"
                         placeholder="Buenos Aires"
@@ -1113,7 +1116,7 @@ export default function CheckoutPage() {
                       )}
                     </div>
                     <div>
-                      <Label htmlFor="provincia">Provincia *</Label>
+                      <Label htmlFor="provincia" className={checkoutLabelClassName}>Provincia *</Label>
                       <Select
                         value={formData.provincia}
                         onValueChange={(value) => {
@@ -1140,7 +1143,7 @@ export default function CheckoutPage() {
                     </div>
                   </div>
                   <div>
-                    <Label htmlFor="codigoPostal">Código postal *</Label>
+                    <Label htmlFor="codigoPostal" className={checkoutLabelClassName}>Código postal *</Label>
                     <Input
                       id="codigoPostal"
                       placeholder="1010"
@@ -1156,7 +1159,7 @@ export default function CheckoutPage() {
                     )}
                   </div>
                   <div>
-                    <Label htmlFor="referencias">Referencias (opcional)</Label>
+                    <Label htmlFor="referencias" className={checkoutLabelClassName}>Referencias (opcional)</Label>
                     <textarea
                       id="referencias"
                       placeholder="Ej: Casa con portón azul, timbre en la derecha"
@@ -1166,17 +1169,17 @@ export default function CheckoutPage() {
                       }
                       rows={3}
                       disabled={submitting}
-                      className="mt-1 w-full rounded-lg border border-input bg-transparent px-3 py-2 text-sm outline-none transition focus-visible:border-ring focus-visible:ring-ring/50"
+                  className={checkoutTextareaClassName}
                     />
                   </div>
                 </CardContent>
               </Card>
             )}
 
-            <Card className="rounded-[2rem]">
+            <Card className={checkoutCardClassName}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5 text-red-600" />
+                  <Truck className="h-5 w-5 text-brand-600" />
                   Método de envío
                 </CardTitle>
               </CardHeader>
@@ -1184,7 +1187,7 @@ export default function CheckoutPage() {
                 {shippingMethods.map((method) => (
                   <label
                     key={method.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
+                    className={checkoutOptionClassName}
                   >
                     <input
                       type="radio"
@@ -1193,7 +1196,7 @@ export default function CheckoutPage() {
                       checked={shippingMethod === method.id}
                       onChange={(event) => setShippingMethod(event.target.value)}
                       disabled={submitting}
-                      className="h-4 w-4 accent-red-600"
+                      className="h-4 w-4 accent-brand-600"
                     />
                     <div className="flex-1">
                       <p className="text-sm font-semibold text-slate-900">
@@ -1214,10 +1217,10 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[2rem]">
+            <Card className={checkoutCardClassName}>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5 text-red-600" />
+                  <CreditCard className="h-5 w-5 text-brand-600" />
                   Método de pago
                 </CardTitle>
               </CardHeader>
@@ -1225,7 +1228,7 @@ export default function CheckoutPage() {
                 {availablePaymentMethods.map((method) => (
                   <label
                     key={method.id}
-                    className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 p-4 transition hover:bg-slate-50"
+                    className={checkoutOptionClassName}
                   >
                     <input
                       type="radio"
@@ -1236,7 +1239,7 @@ export default function CheckoutPage() {
                         setPaymentMethod(event.target.value as PaymentMethodId)
                       }
                       disabled={submitting}
-                      className="h-4 w-4 accent-red-600"
+                      className="h-4 w-4 accent-brand-600"
                     />
                     <span className="text-lg">{method.icon}</span>
                     <span className="text-sm font-semibold text-slate-900">{method.label}</span>
@@ -1248,7 +1251,7 @@ export default function CheckoutPage() {
               </CardContent>
             </Card>
 
-            <Card className="rounded-[2rem]">
+            <Card className={checkoutCardClassName}>
               <CardContent className="pt-6">
                 <label className="flex items-start gap-3">
                   <input
@@ -1256,15 +1259,15 @@ export default function CheckoutPage() {
                     checked={acceptTerms}
                     onChange={(event) => setAcceptTerms(event.target.checked)}
                     disabled={submitting}
-                    className="mt-1 h-4 w-4 rounded border-slate-300 text-red-600 accent-red-600"
+                      className="mt-1 h-4 w-4 rounded border-brand-200 accent-brand-600"
                   />
                   <span className="text-sm text-slate-600">
                     Acepto los{' '}
-                    <a href="#" className="text-red-600 hover:underline">
+                    <a href="#" className="text-brand-600 hover:underline">
                       términos y condiciones
                     </a>{' '}
                     y la{' '}
-                    <a href="#" className="text-red-600 hover:underline">
+                    <a href="#" className="text-brand-600 hover:underline">
                       política de privacidad
                     </a>
                   </span>
@@ -1273,7 +1276,7 @@ export default function CheckoutPage() {
                 <Button
                   type="submit"
                   disabled={submitting}
-                  className="mt-6 w-full rounded-full bg-red-600 px-6 py-4 text-base font-semibold text-white shadow-lg shadow-red-600/10 hover:bg-red-700"
+                  className="mt-6 w-full rounded-xl py-4 text-base font-semibold shadow-lg"
                 >
                   {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   {submitting ? 'Procesando pedido...' : 'Confirmar compra'}
@@ -1283,7 +1286,7 @@ export default function CheckoutPage() {
           </form>
 
           <aside className="sticky top-6 space-y-6">
-            <Card className="rounded-[2rem]">
+            <Card className={checkoutSummaryClassName}>
               <CardHeader>
                 <CardTitle>Resumen del pedido</CardTitle>
               </CardHeader>
@@ -1313,13 +1316,13 @@ export default function CheckoutPage() {
                     <span>${subtotal.toLocaleString('es-AR')}</span>
                   </div>
                   {showFreeShippingProgress ? (
-                    <div className="space-y-2 rounded-lg bg-slate-50 p-3">
-                      <p className="text-sm font-medium text-slate-800">
+                    <div className="space-y-2 rounded-xl border border-brand-100 bg-brand-50/50 p-3">
+                      <p className="text-sm font-medium text-brand-800">
                         ¡Te faltan ${freeShippingRemaining.toLocaleString('es-AR')} para envío gratis!
                       </p>
-                      <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-brand-100">
                         <div
-                          className="h-full rounded-full bg-red-600 transition-all duration-300"
+                          className="h-full rounded-full bg-brand-600 transition-all duration-300"
                           style={{ width: `${freeShippingProgressPercent}%` }}
                         />
                       </div>
@@ -1344,11 +1347,11 @@ export default function CheckoutPage() {
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="font-semibold text-slate-900">Total</span>
-                  <span className="text-2xl font-semibold text-red-600">
+                  <span className="text-2xl font-bold text-brand-700">
                     ${total.toLocaleString('es-AR')}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                <div className="flex items-center gap-2 rounded-xl border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-brand-700">
                   <Shield className="h-4 w-4 text-emerald-600" />
                   Pago seguro con Mercado Pago
                 </div>

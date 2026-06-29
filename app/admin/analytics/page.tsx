@@ -146,18 +146,18 @@ export default async function AnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-border bg-white px-6 py-6">
+    <div className="min-h-full">
+      <div className="border-b border-brand-200 bg-white/60 px-6 py-6 backdrop-blur-md">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="text-3xl font-semibold text-foreground">Analíticas</h1>
-            <p className="text-sm text-muted-foreground">
+            <h1 className="text-3xl font-bold text-brand-900">Analíticas</h1>
+            <p className="text-sm text-brand-600">
               Monitoreá el rendimiento de {analytics.storeName} con datos reales de tu tienda.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="rounded-2xl border border-border bg-slate-50 px-4 py-3">
-              <Label className="text-xs uppercase tracking-[0.3em] text-muted-foreground">Rango</Label>
+            <div className="rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-3">
+              <Label className="text-xs uppercase tracking-[0.3em] text-brand-600">Rango</Label>
               <div className="mt-2 w-48">
                 <Select defaultValue="Últimos 30 días">
                   <SelectTrigger className="w-full">
@@ -173,7 +173,7 @@ export default async function AnalyticsPage() {
                 </Select>
               </div>
             </div>
-            <Button className="bg-red-600 text-white hover:bg-red-700">
+            <Button>
               <Eye className="mr-2 h-4 w-4" /> Ver período
             </Button>
           </div>
@@ -262,7 +262,7 @@ export default async function AnalyticsPage() {
                 <CardTitle>Ingresos en el tiempo</CardTitle>
                 <p className="text-sm text-muted-foreground">Ingresos y pedidos de los últimos 30 días.</p>
               </div>
-              <div className="inline-flex items-center gap-2 rounded-2xl border border-border bg-slate-50 px-4 py-2 text-sm">
+              <div className="inline-flex items-center gap-2 rounded-2xl border border-brand-100 bg-brand-50/50 px-4 py-2 text-sm">
                 <BarChart3 className="h-4 w-4 text-foreground" />
                 <span>Últimos 30 días</span>
               </div>
