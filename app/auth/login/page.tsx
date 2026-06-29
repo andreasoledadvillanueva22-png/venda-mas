@@ -4,7 +4,7 @@ import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
@@ -15,6 +15,16 @@ import {
   getSiteOrigin,
 } from '@/lib/supabase/client'
 import { completeOnboardingRequest } from '@/lib/onboarding-client'
+import {
+  authErrorClassName,
+  authGlassCardClassName,
+  authInputClassName,
+  authLabelClassName,
+  authLinkClassName,
+  authMutedTextClassName,
+  authSubmitButtonClassName,
+} from '@/lib/auth-styles'
+import { AuthFormHeader } from '@/components/auth/auth-form-header'
 import Link from 'next/link'
 
 function getRedirectPath(searchParams: URLSearchParams): string {
@@ -31,8 +41,8 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex min-h-screen items-center justify-center bg-slate-50">
-          <Loader2 className="h-8 w-8 animate-spin text-red-600" />
+        <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-800 via-brand-600 to-brand-400">
+          <Loader2 className="h-8 w-8 animate-spin text-white" />
         </div>
       }
     >
@@ -155,27 +165,21 @@ function LoginPageContent() {
   }
 
   return (
-    <Card className="border-0 shadow-xl">
-      <CardHeader className="text-center space-y-2 pb-6">
-        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-100 mx-auto">
-          <span className="text-lg font-bold text-red-600">F</span>
-        </div>
-        <CardTitle className="text-3xl font-bold text-slate-950">VendaMás</CardTitle>
-        <CardDescription className="text-base">Iniciar sesión en tu cuenta</CardDescription>
+    <Card className={authGlassCardClassName}>
+      <CardHeader className="space-y-0 pb-0">
+        <AuthFormHeader title="Iniciar sesión" description="Ingresá a tu panel de administración" />
       </CardHeader>
 
       <CardContent className="space-y-6">
         <form onSubmit={handleLogin} className="space-y-4">
-          {error && (
-            <div className="rounded-lg bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-700">
-              {error}
-            </div>
-          )}
+          {error && <div className={authErrorClassName}>{error}</div>}
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-slate-700">Email</Label>
+            <Label htmlFor="email" className={authLabelClassName}>
+              Email
+            </Label>
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Mail className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
               <Input
                 id="email"
                 type="email"
@@ -183,16 +187,18 @@ function LoginPageContent() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="pl-10"
+                className={`pl-10 ${authInputClassName}`}
                 required
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-slate-700">Contraseña</Label>
+            <Label htmlFor="password" className={authLabelClassName}>
+              Contraseña
+            </Label>
             <div className="relative">
-              <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-white/70" />
               <Input
                 id="password"
                 type={showPassword ? 'text' : 'password'}
@@ -200,32 +206,25 @@ function LoginPageContent() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="pl-10 pr-10"
+                className={`pl-10 pr-10 ${authInputClassName}`}
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 disabled={loading}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition disabled:opacity-50"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/70 transition hover:text-white disabled:opacity-50"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
           </div>
 
-          <Link
-            href="/auth/forgot-password"
-            className="text-xs text-red-600 hover:text-red-700 transition font-medium"
-          >
+          <Link href="/auth/forgot-password" className={`text-xs ${authLinkClassName}`}>
             ¿Olvidaste tu contraseña?
           </Link>
 
-          <Button
-            type="submit"
-            disabled={loading}
-            className="w-full rounded-lg bg-red-600 text-white hover:bg-red-700 h-10 font-semibold transition disabled:opacity-50"
-          >
+          <Button type="submit" disabled={loading} className={authSubmitButtonClassName}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             {loading ? 'Iniciando sesión...' : 'Iniciar sesión'}
           </Button>
@@ -233,10 +232,10 @@ function LoginPageContent() {
 
         <div className="relative">
           <div className="absolute inset-0 flex items-center">
-            <Separator className="w-full" />
+            <Separator className="w-full bg-white/20" />
           </div>
           <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-white px-2 text-slate-500 font-medium">o</span>
+            <span className="bg-transparent px-2 font-medium text-white/70">o</span>
           </div>
         </div>
 
@@ -244,8 +243,8 @@ function LoginPageContent() {
           type="button"
           onClick={handleGoogleLogin}
           disabled={loading}
-          variant="outline"
-          className="w-full rounded-lg h-10 font-semibold transition border-slate-200 hover:bg-slate-50"
+          variant="secondary"
+          className="h-11 w-full rounded-xl border-white/30 bg-white/20 text-white hover:bg-white/30"
         >
           <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
             <path
@@ -268,9 +267,9 @@ function LoginPageContent() {
           Continuar con Google
         </Button>
 
-        <p className="text-center text-sm text-slate-600">
+        <p className={`text-center text-sm ${authMutedTextClassName}`}>
           ¿No tenés cuenta?{' '}
-          <Link href="/auth/register" className="text-red-600 hover:text-red-700 font-semibold transition">
+          <Link href="/auth/register" className={authLinkClassName}>
             Registrate aquí
           </Link>
         </p>

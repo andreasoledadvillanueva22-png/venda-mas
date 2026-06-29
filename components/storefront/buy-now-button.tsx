@@ -57,7 +57,7 @@ export function BuyNowButton({
       onClick={handleBuyNow}
       disabled={stock === 0}
       className={cn(
-        'w-full touch-manipulation disabled:cursor-not-allowed disabled:opacity-50',
+        'w-full touch-manipulation rounded-xl border-2 border-red-600 font-semibold text-red-600 shadow-sm hover:bg-red-600 hover:text-white disabled:cursor-not-allowed disabled:opacity-50',
         className,
       )}
     >

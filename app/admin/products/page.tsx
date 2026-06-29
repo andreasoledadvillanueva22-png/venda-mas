@@ -41,8 +41,8 @@ function formatPrice(value: number) {
 
 function statusBadgeClasses(status: ProductRow['status']) {
   return status === 'Activo'
-    ? 'bg-emerald-100 text-emerald-700'
-    : 'bg-slate-100 text-slate-700'
+    ? 'bg-green-100 text-green-700'
+    : 'bg-brand-100 text-brand-700'
 }
 
 function mapProduct(product: DbProduct): ProductRow {
@@ -106,16 +106,16 @@ export default async function ProductsPage({
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-border bg-white px-6 py-6">
+    <div className="min-h-full">
+      <div className="border-b border-brand-200 bg-white/60 px-6 py-6 backdrop-blur-md">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="text-sm font-medium uppercase tracking-[0.2em] text-muted-foreground">Módulo 2</p>
-            <h1 className="text-3xl font-semibold text-foreground">Productos</h1>
+            <p className="text-sm font-medium uppercase tracking-[0.2em] text-brand-600">Módulo 2</p>
+            <h1 className="text-3xl font-bold text-brand-900">Productos</h1>
           </div>
           <Link
             href="/admin/products/new"
-            className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-red-700"
+            className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-lg transition hover:bg-brand-700"
           >
             <Plus className="h-4 w-4" />
             Agregar producto

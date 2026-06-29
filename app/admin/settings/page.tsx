@@ -1470,8 +1470,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
   const platformDomain = process.env.NEXT_PUBLIC_PLATFORM_DOMAIN ?? 'venda-mas.vercel.app'
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="border-b border-border bg-white px-6 py-6">
+    <div className="min-h-full">
+      <div className="border-b border-brand-200 bg-white/60 px-6 py-6 backdrop-blur-md">
         <div>
           <h1 className="text-3xl font-semibold text-foreground">Configuración</h1>
           <p className="text-sm text-muted-foreground">

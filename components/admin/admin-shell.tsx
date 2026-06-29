@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
 import { AdminSidebar } from '@/components/admin/sidebar'
+import { Logo } from '@/components/ui/logo'
 import type { AdminLayoutData } from '@/lib/admin-store'
 
 type AdminShellProps = AdminLayoutData & {
@@ -20,10 +21,10 @@ export function AdminShell({
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-brand-50 to-brand-100">
       {sidebarOpen ? (
         <div
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-brand-900/20 backdrop-blur-sm lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       ) : null}
@@ -44,21 +45,17 @@ export function AdminShell({
       </div>
 
       <div className="flex flex-1 flex-col overflow-hidden">
-        <div className="flex h-14 items-center gap-4 border-b border-border bg-card px-4 lg:hidden">
+        <div className="flex h-14 items-center gap-4 border-b border-brand-200 bg-white/60 px-4 backdrop-blur-md lg:hidden">
           <button
             type="button"
             onClick={() => setSidebarOpen(true)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-xl text-brand-700 hover:bg-brand-50"
           >
             <Menu className="h-5 w-5" />
             <span className="sr-only">Abrir menú</span>
           </button>
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary">
-              <span className="text-xs font-bold text-primary-foreground">{brandInitials}</span>
-            </div>
-            <span className="truncate font-semibold text-foreground">{storeName}</span>
-          </div>
+          <Logo size="sm" />
+          <span className="truncate font-semibold text-brand-900">{storeName}</span>
         </div>
 
         <main className="flex-1 overflow-y-auto">{children}</main>

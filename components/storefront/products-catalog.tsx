@@ -271,7 +271,10 @@ export function ProductsCatalog({
                 const imageUrl = product.images[0] ?? null
 
                 return (
-                  <Card key={product.id} className="overflow-hidden transition-shadow hover:shadow-lg">
+                  <Card
+                    key={product.id}
+                    className="overflow-hidden rounded-2xl border-slate-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                  >
                     <CardContent className="p-0">
                       <Link href={productHref(product.id)} className="group block">
                         <div className="relative aspect-square overflow-hidden bg-slate-100">
@@ -287,7 +290,7 @@ export function ProductsCatalog({
                             </div>
                           )}
                           {badge && (
-                            <Badge className={`absolute left-3 top-3 ${badge.className} text-white`}>
+                            <Badge className={`absolute right-2 top-2 rounded-lg px-2 py-1 text-xs font-bold text-white ${badge.className}`}>
                               {badge.label}
                             </Badge>
                           )}
@@ -310,7 +313,7 @@ export function ProductsCatalog({
                         <Button
                           type="button"
                           size="sm"
-                          className="touch-manipulation bg-red-600 hover:bg-red-700"
+                          className="touch-manipulation rounded-xl bg-red-600 font-semibold shadow-lg hover:bg-red-700 hover:shadow-xl"
                           onClick={() =>
                             addToCart({
                               id: product.id,

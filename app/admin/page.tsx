@@ -45,8 +45,6 @@ export default async function AdminDashboard() {
             change={stats.revenueChange}
             changeLabel="vs mes anterior"
             icon={DollarSign}
-            iconBgColor="bg-success/10"
-            iconColor="text-success"
           />
           <KPICard
             title="Pedidos"
@@ -54,8 +52,6 @@ export default async function AdminDashboard() {
             change={stats.ordersChange}
             changeLabel="vs mes anterior"
             icon={ShoppingCart}
-            iconBgColor="bg-primary/10"
-            iconColor="text-primary"
           />
           <KPICard
             title="Clientes nuevos"
@@ -63,8 +59,6 @@ export default async function AdminDashboard() {
             change={stats.customersChange}
             changeLabel="vs mes anterior"
             icon={Users}
-            iconBgColor="bg-blue-100"
-            iconColor="text-blue-600"
           />
           <KPICard
             title="Tasa de conversión"
@@ -72,8 +66,6 @@ export default async function AdminDashboard() {
             change={stats.conversionChange}
             changeLabel="vs mes anterior"
             icon={TrendingUp}
-            iconBgColor="bg-amber-100"
-            iconColor="text-amber-600"
           />
         </div>
 

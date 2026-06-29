@@ -1,10 +1,12 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Search, User, ShoppingCart, Store, Mail, Phone, MapPin } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
 import type { StorefrontRecentPurchase, StorefrontStore } from '@/lib/storefront'
 import { buildWhatsappUrl, normalizeSocialUrl, storefrontHref } from '@/lib/storefront'
+import { cn } from '@/lib/utils'
 import { FloatingWhatsappButton } from '@/components/storefront/floating-whatsapp-button'
 import { RecentPurchaseNotifications } from '@/components/storefront/recent-purchase-notifications'
 import { Logo } from '@/components/ui/logo'
@@ -35,6 +37,7 @@ function StoreLogo({ store }: { store: StorefrontStore }) {
 
 export function StorefrontShell({ store, recentPurchases = [], children }: StorefrontShellProps) {
   const { totalItems, setIsCartOpen } = useCart()
+  const [scrolled, setScrolled] = useState(false)
   const storeSlug = store?.slug ?? null
   const storeName = store?.name ?? 'Tienda Online'
   const freeShippingThreshold = store?.freeShippingThreshold ?? 50000
@@ -52,13 +55,27 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
 
   const hasSocialLinks = Boolean(store?.footerInstagram || store?.footerFacebook)
 
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   return (
     <div className="flex min-h-screen flex-col bg-white">
       <div className="bg-slate-900 py-2 text-center text-sm text-white">
         Envío gratis en compras superiores a ${formattedThreshold}
       </div>
 
-      <header className="sticky top-0 z-30 border-b border-slate-200 bg-white">
+      <header
+        className={cn(
+          'sticky top-0 z-30 border-b transition-all duration-300',
+          scrolled
+            ? 'border-slate-200/80 bg-white/80 shadow-sm backdrop-blur-lg'
+            : 'border-transparent bg-white',
+        )}
+      >
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between">
             <Link href={homeHref} className="flex items-center gap-2">
@@ -127,7 +144,7 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
 
       <main className="flex-1">{children}</main>
 
-      <footer className="mt-auto bg-slate-900 py-12 text-white">
+      <footer className="mt-auto bg-gray-900 py-12 text-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-4">
             <div>
