@@ -28,7 +28,7 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
   { name: 'Products', href: '/admin/products', icon: Package },
-  { name: 'Orders', href: '/admin/orders', icon: ShoppingCart, badge: 8 },
+  { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
   { name: 'Customers', href: '/admin/customers', icon: Users },
   { name: 'Marketing', href: '/admin/marketing', icon: Megaphone },
   { name: 'Design', href: '/admin/design', icon: Palette },
@@ -37,26 +37,37 @@ const navigation = [
 ]
 
 interface AdminSidebarProps {
+  storeName: string
+  brandInitials: string
   userEmail?: string
+  userFullName?: string | null
   userAvatar?: string
+  ordersCount?: number
   onClose?: () => void
 }
 
 export function AdminSidebar({
+  storeName,
+  brandInitials,
   userEmail = 'admin@VendaMás.com',
+  userFullName,
   userAvatar,
+  ordersCount = 0,
   onClose,
 }: AdminSidebarProps) {
   const pathname = usePathname()
+  const userInitial = (userFullName?.trim() || userEmail).charAt(0).toUpperCase()
+  const userDisplayName = userFullName?.trim() || userEmail
 
   return (
     <aside className="flex h-screen w-64 flex-col bg-sidebar text-sidebar-foreground">
-      {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-5">
-        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-          <span className="text-lg font-bold text-primary-foreground">AV</span>
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary">
+          <span className="text-sm font-bold text-primary-foreground">{brandInitials}</span>
         </div>
-        <span className="flex-1 text-lg font-bold tracking-tight text-sidebar-foreground">VendaMás</span>
+        <span className="flex-1 truncate text-lg font-bold tracking-tight text-sidebar-foreground">
+          {storeName}
+        </span>
         {onClose ? (
           <button
             type="button"
@@ -88,11 +99,11 @@ export function AdminSidebar({
               >
                 <item.icon className="h-5 w-5 shrink-0" />
                 <span className="flex-1">{item.name}</span>
-                {item.badge && (
+                {item.href === '/admin/orders' && ordersCount > 0 ? (
                   <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-medium text-primary-foreground">
-                    {item.badge}
+                    {ordersCount}
                   </span>
-                )}
+                ) : null}
               </Link>
             )
           })}
@@ -106,11 +117,11 @@ export function AdminSidebar({
             <Avatar className="h-9 w-9">
               <AvatarImage src={userAvatar} alt="Avatar" />
               <AvatarFallback className="bg-sidebar-accent text-sidebar-accent-foreground text-sm font-medium">
-                {userEmail.charAt(0).toUpperCase()}
+                {userInitial}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 text-left">
-              <p className="truncate text-sm font-medium text-sidebar-foreground">{userEmail}</p>
+              <p className="truncate text-sm font-medium text-sidebar-foreground">{userDisplayName}</p>
               <p className="text-xs text-sidebar-muted">Administrator</p>
             </div>
             <ChevronDown className="h-4 w-4 text-sidebar-muted" />

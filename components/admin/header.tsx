@@ -1,6 +1,6 @@
 'use client'
 
-import { Bell, HelpCircle, Store, ExternalLink } from 'lucide-react'
+import { Bell, HelpCircle, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -16,14 +16,15 @@ interface AdminHeaderProps {
   storeName: string
   storeDomain: string
   storeSlug: string
+  initials: string
 }
 
-export function AdminHeader({ storeName, storeDomain, storeSlug }: AdminHeaderProps) {
+export function AdminHeader({ storeName, storeDomain, storeSlug, initials }: AdminHeaderProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
       <div className="flex items-center gap-3">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-success/10">
-          <Store className="h-4 w-4 text-success" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+          <span className="text-xs font-bold text-primary-foreground">{initials}</span>
         </div>
         <div className="text-left">
           <p className="font-semibold text-foreground">{storeName}</p>

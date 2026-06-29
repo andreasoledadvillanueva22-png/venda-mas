@@ -34,6 +34,7 @@ export default async function AdminDashboard() {
         storeName={store.name}
         storeDomain={storeDomain}
         storeSlug={store.slug}
+        initials={store.initials}
       />
 
       <div className="flex-1 space-y-6 p-6">
