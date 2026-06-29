@@ -45,6 +45,7 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [form, setForm] = useState(initialForm)
 
   useEffect(() => {
@@ -68,9 +69,14 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
     void loadReviews()
   }, [supabase, storeId, productId])
 
-  const handleAddReview = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault()
+  const handleAddReview = async () => {
     setError('')
+    setSuccess('')
+
+    if (!storeId.trim() || !productId.trim()) {
+      setError('No se pudo identificar la tienda o el producto.')
+      return
+    }
 
     if (!form.customerName.trim() || !form.comment.trim()) {
       setError('El nombre y el comentario son obligatorios.')
@@ -85,33 +91,37 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
 
     setSaving(true)
 
-    const { data, error: insertError } = await supabase
-      .from('product_reviews')
-      .insert({
-        store_id: storeId,
-        product_id: productId,
-        customer_name: form.customerName.trim(),
-        rating,
-        comment: form.comment.trim(),
-        source: form.source,
-        source_url: form.sourceUrl.trim() || null,
-      })
-      .select('id, customer_name, rating, comment, source, source_url')
-      .single()
+    try {
+      const { data, error: insertError } = await supabase
+        .from('product_reviews')
+        .insert({
+          store_id: storeId,
+          product_id: productId,
+          customer_name: form.customerName.trim(),
+          rating,
+          comment: form.comment.trim(),
+          source: form.source,
+          source_url: form.sourceUrl.trim() || null,
+        })
+        .select('id, customer_name, rating, comment, source, source_url')
+        .single()
 
-    setSaving(false)
+      if (insertError || !data) {
+        setError(insertError?.message ?? 'No se pudo guardar la reseña.')
+        return
+      }
 
-    if (insertError || !data) {
-      setError(insertError?.message ?? 'No se pudo guardar la reseña.')
-      return
+      setReviews((current) => [data as DbProductReview, ...current])
+      setForm(initialForm)
+      setSuccess('Reseña guardada correctamente.')
+    } finally {
+      setSaving(false)
     }
-
-    setReviews((current) => [data as DbProductReview, ...current])
-    setForm(initialForm)
   }
 
   const handleDeleteReview = async (reviewId: string) => {
     setError('')
+    setSuccess('')
     const { error: deleteError } = await supabase
       .from('product_reviews')
       .delete()
@@ -140,6 +150,12 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
         {error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {error}
+          </div>
+        ) : null}
+
+        {success ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {success}
           </div>
         ) : null}
 
@@ -183,7 +199,17 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
           </p>
         )}
 
-        <form onSubmit={(event) => void handleAddReview(event)} className="space-y-4 border-t border-border pt-6">
+        <div
+          className="space-y-4 border-t border-border pt-6"
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter' || (event.target as HTMLElement).tagName === 'TEXTAREA') {
+              return
+            }
+
+            event.preventDefault()
+            event.stopPropagation()
+          }}
+        >
           <p className="text-sm font-medium text-foreground">Importar reseña</p>
 
           <div className="grid gap-4 sm:grid-cols-2">
@@ -262,10 +288,19 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
             />
           </div>
 
-          <Button type="submit" disabled={saving} className="bg-red-600 text-white hover:bg-red-700">
-            {saving ? 'Guardando...' : 'Agregar reseña'}
+          <Button
+            type="button"
+            disabled={saving}
+            className="bg-red-600 text-white hover:bg-red-700"
+            onClick={(event) => {
+              event.preventDefault()
+              event.stopPropagation()
+              void handleAddReview()
+            }}
+          >
+            {saving ? 'Guardando...' : 'Guardar reseña'}
           </Button>
-        </form>
+        </div>
       </CardContent>
     </Card>
   )

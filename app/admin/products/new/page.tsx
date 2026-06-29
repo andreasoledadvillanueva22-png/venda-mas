@@ -858,12 +858,16 @@ function NewProductPageContent() {
               </CardContent>
             </Card>
 
-            {isEditMode && storeId && editProductId ? (
-              <ProductReviewsManager storeId={storeId} productId={editProductId} />
-            ) : null}
           </div>
         </div>
       </form>
+
+      {isEditMode && storeId && editProductId ? (
+        <div className="grid gap-6 px-6 pb-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="hidden lg:block" aria-hidden="true" />
+          <ProductReviewsManager storeId={storeId} productId={editProductId} />
+        </div>
+      ) : null}
     </div>
   )
 }
