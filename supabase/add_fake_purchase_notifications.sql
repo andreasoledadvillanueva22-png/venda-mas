@@ -46,6 +46,9 @@ CREATE POLICY "Propietarios actualizan notificaciones ficticias"
   ON fake_purchase_notifications FOR UPDATE
   USING (
     store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid())
+  )
+  WITH CHECK (
+    store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid())
   );
 
 DROP POLICY IF EXISTS "Propietarios eliminan notificaciones ficticias" ON fake_purchase_notifications;
@@ -54,5 +57,8 @@ CREATE POLICY "Propietarios eliminan notificaciones ficticias"
   USING (
     store_id IN (SELECT id FROM stores WHERE owner_id = auth.uid())
   );
+
+GRANT SELECT, INSERT, UPDATE, DELETE ON fake_purchase_notifications TO authenticated;
+GRANT SELECT ON fake_purchase_notifications TO anon;
 
 COMMENT ON TABLE fake_purchase_notifications IS 'Mensajes ficticios de compra reciente para pop-ups de urgencia en el storefront';

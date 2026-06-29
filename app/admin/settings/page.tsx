@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   generateDomainVerificationToken,
   getDomainTxtHost,
@@ -220,6 +221,14 @@ function parseTestimonialRating(value: FormDataEntryValue | null): number {
   return parsed
 }
 
+function getAdminClientForStoreActions() {
+  try {
+    return createAdminClient()
+  } catch {
+    return null
+  }
+}
+
 async function verifyOwnedStore(storeId: string) {
   const supabase = await createClient()
 
@@ -286,18 +295,25 @@ async function getSettingsData(): Promise<SettingsData | null> {
     .eq('store_id', store.id)
     .order('created_at', { ascending: false })
 
-  const { data: fakePurchaseNotifications } = await supabase
-    .from('fake_purchase_notifications')
-    .select('id, customer_name, customer_city, product_name, minutes_ago, is_active, created_at')
-    .eq('store_id', store.id)
-    .order('created_at', { ascending: false })
+  const admin = getAdminClientForStoreActions()
+  let fakePurchaseNotifications: DbFakePurchaseNotification[] = []
+
+  if (admin) {
+    const { data } = await admin
+      .from('fake_purchase_notifications')
+      .select('id, customer_name, customer_city, product_name, minutes_ago, is_active, created_at')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false })
+
+    fakePurchaseNotifications = (data ?? []) as DbFakePurchaseNotification[]
+  }
 
   return {
     email: user.email,
     profile: profile as DbProfile,
     store: store as DbStore,
     testimonials: (testimonials ?? []) as DbTestimonial[],
-    fakePurchaseNotifications: (fakePurchaseNotifications ?? []) as DbFakePurchaseNotification[],
+    fakePurchaseNotifications,
   }
 }
 
@@ -674,14 +690,22 @@ export async function saveFakePurchaseNotification(formData: FormData): Promise<
     )
   }
 
-  const { count, error: countError } = await supabase
+  const admin = getAdminClientForStoreActions()
+
+  if (!admin) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.')}`,
+    )
+  }
+
+  const { count, error: countError } = await admin
     .from('fake_purchase_notifications')
     .select('id', { count: 'exact', head: true })
     .eq('store_id', store.id)
 
   if (countError) {
     redirect(
-      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo validar el límite de mensajes.')}`,
+      `/admin/settings?fake_notification_error=${encodeURIComponent(countError.message || 'No se pudo validar el límite de mensajes.')}`,
     )
   }
 
@@ -693,7 +717,7 @@ export async function saveFakePurchaseNotification(formData: FormData): Promise<
 
   const isActive = formData.get('isActive') === 'on'
 
-  const { error: insertError } = await supabase.from('fake_purchase_notifications').insert({
+  const { error: insertError } = await admin.from('fake_purchase_notifications').insert({
     store_id: store.id,
     customer_name: customerName.trim(),
     customer_city: customerCity.trim(),
@@ -703,8 +727,9 @@ export async function saveFakePurchaseNotification(formData: FormData): Promise<
   })
 
   if (insertError) {
+    console.error('[saveFakePurchaseNotification]', insertError)
     redirect(
-      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo guardar el mensaje ficticio.')}`,
+      `/admin/settings?fake_notification_error=${encodeURIComponent(insertError.message || 'No se pudo guardar el mensaje ficticio.')}`,
     )
   }
 
@@ -743,15 +768,24 @@ export async function deleteFakePurchaseNotification(formData: FormData): Promis
     )
   }
 
-  const { error: deleteError } = await supabase
+  const admin = getAdminClientForStoreActions()
+
+  if (!admin) {
+    redirect(
+      `/admin/settings?fake_notification_error=${encodeURIComponent('Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.')}`,
+    )
+  }
+
+  const { error: deleteError } = await admin
     .from('fake_purchase_notifications')
     .delete()
     .eq('id', notificationId.trim())
     .eq('store_id', store.id)
 
   if (deleteError) {
+    console.error('[deleteFakePurchaseNotification]', deleteError)
     redirect(
-      `/admin/settings?fake_notification_error=${encodeURIComponent('No se pudo eliminar el mensaje ficticio.')}`,
+      `/admin/settings?fake_notification_error=${encodeURIComponent(deleteError.message || 'No se pudo eliminar el mensaje ficticio.')}`,
     )
   }
 
