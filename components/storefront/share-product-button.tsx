@@ -1,16 +1,8 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Link2, Share2 } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
   buildFacebookShareUrl,
   buildShareMessage,
@@ -83,6 +75,7 @@ export function ShareProductButton({
   shareUrl,
   className,
 }: ShareProductButtonProps) {
+  const rootRef = useRef<HTMLDivElement>(null)
   const [open, setOpen] = useState(false)
   const [feedback, setFeedback] = useState<string | null>(null)
 
@@ -151,7 +144,7 @@ export function ShareProductButton({
     },
   ]
 
-  const handlePrimaryShare = async (): Promise<boolean> => {
+  const handlePrimaryShare = useCallback(async (): Promise<boolean> => {
     if (!canUseNativeShare()) {
       return false
     }
@@ -169,54 +162,94 @@ export function ShareProductButton({
       }
       return false
     }
-  }
+  }, [productName, shareMessage, shareUrl])
+
+  const handleButtonClick = useCallback(
+    async (event: React.MouseEvent<HTMLButtonElement>) => {
+      event.preventDefault()
+      event.stopPropagation()
+
+      if (canUseNativeShare()) {
+        const handled = await handlePrimaryShare()
+        if (handled) {
+          setOpen(false)
+          return
+        }
+      }
+
+      setOpen((current) => !current)
+    },
+    [handlePrimaryShare],
+  )
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        setOpen(false)
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handlePointerDown)
+    document.addEventListener('keydown', handleEscape)
+
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
 
   return (
-    <div className={cn('relative', className)}>
-      <DropdownMenu open={open} onOpenChange={setOpen}>
-        <DropdownMenuTrigger
-          className={cn(
-            buttonVariants({ variant: 'outline', size: 'lg' }),
-            'w-full touch-manipulation border-slate-300 bg-white hover:bg-slate-50 sm:w-auto',
-          )}
-          onClick={(event) => {
-            if (!canUseNativeShare()) {
-              return
-            }
+    <div ref={rootRef} className={cn('relative', className)}>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="menu"
+        className={cn(
+          buttonVariants({ variant: 'outline', size: 'lg' }),
+          'w-full touch-manipulation border-slate-300 bg-white hover:bg-slate-50 sm:w-auto',
+        )}
+        onClick={(event) => {
+          void handleButtonClick(event)
+        }}
+      >
+        <Share2 className="mr-2 h-5 w-5" />
+        Compartir
+      </button>
 
-            event.preventDefault()
-            void handlePrimaryShare().then((handled) => {
-              if (!handled) {
-                setOpen(true)
-              }
-            })
-          }}
+      {open ? (
+        <div
+          role="menu"
+          aria-label="Compartir producto"
+          className="absolute bottom-full right-0 z-50 mb-2 w-[min(calc(100vw-2rem),18rem)] origin-bottom-right rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10 animate-in fade-in-0 zoom-in-95"
         >
-          <Share2 className="mr-2 h-5 w-5" />
-          Compartir
-        </DropdownMenuTrigger>
-
-        <DropdownMenuContent
-          align="end"
-          side="top"
-          className="w-[min(calc(100vw-2rem),18rem)]"
-        >
-          <DropdownMenuLabel>Compartir producto</DropdownMenuLabel>
-          <DropdownMenuSeparator />
+          <p className="px-1.5 py-1 text-xs font-medium text-muted-foreground">Compartir producto</p>
+          <div className="-mx-1 my-1 h-px bg-border" />
           {shareOptions.map((option) => (
-            <DropdownMenuItem
+            <button
               key={option.id}
-              className="cursor-pointer gap-3 py-2.5"
+              type="button"
+              role="menuitem"
+              className="flex w-full cursor-pointer items-center gap-3 rounded-md px-1.5 py-2.5 text-left text-sm outline-hidden select-none hover:bg-accent hover:text-accent-foreground focus:bg-accent focus:text-accent-foreground"
               onClick={() => {
                 void option.action()
               }}
             >
               {option.icon}
               <span>{option.label}</span>
-            </DropdownMenuItem>
+            </button>
           ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
+        </div>
+      ) : null}
 
       {feedback ? (
         <div
