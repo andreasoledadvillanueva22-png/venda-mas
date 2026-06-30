@@ -68,6 +68,8 @@ type DbStore = {
   footer_whatsapp: string | null
   footer_instagram: string | null
   footer_facebook: string | null
+  footer_tiktok: string | null
+  footer_twitter: string | null
 }
 
 type DbTestimonial = {
@@ -202,6 +204,40 @@ function parseOptionalText(value: FormDataEntryValue | null): string | null {
   return trimmed || null
 }
 
+function parseOptionalSocialUrl(
+  value: FormDataEntryValue | null,
+  fieldLabel: string,
+): { value: string | null } | { error: string } {
+  if (typeof value !== 'string') {
+    return { value: null }
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return { value: null }
+  }
+
+  if (trimmed.startsWith('@')) {
+    return { value: trimmed }
+  }
+
+  try {
+    const normalized =
+      trimmed.startsWith('http://') || trimmed.startsWith('https://')
+        ? trimmed
+        : `https://${trimmed}`
+    const url = new URL(normalized)
+
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      return { error: `${fieldLabel} debe ser una URL válida (https://...).` }
+    }
+
+    return { value: normalized }
+  } catch {
+    return { error: `${fieldLabel} debe ser una URL válida (https://...).` }
+  }
+}
+
 function parseFakeNotificationMinutes(value: FormDataEntryValue | null): number {
   const parsed = Number(typeof value === 'string' ? value.trim() : '')
   if (Number.isNaN(parsed) || parsed < 1) {
@@ -283,7 +319,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook',
+      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook, footer_tiktok, footer_twitter',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -521,6 +557,26 @@ export async function saveFooterSettings(formData: FormData): Promise<void> {
     )
   }
 
+  const instagram = parseOptionalSocialUrl(formData.get('footerInstagram'), 'Instagram')
+  if ('error' in instagram) {
+    redirect(`/admin/settings?footer_error=${encodeURIComponent(instagram.error)}`)
+  }
+
+  const facebook = parseOptionalSocialUrl(formData.get('footerFacebook'), 'Facebook')
+  if ('error' in facebook) {
+    redirect(`/admin/settings?footer_error=${encodeURIComponent(facebook.error)}`)
+  }
+
+  const tiktok = parseOptionalSocialUrl(formData.get('footerTiktok'), 'TikTok')
+  if ('error' in tiktok) {
+    redirect(`/admin/settings?footer_error=${encodeURIComponent(tiktok.error)}`)
+  }
+
+  const twitter = parseOptionalSocialUrl(formData.get('footerTwitter'), 'X (Twitter)')
+  if ('error' in twitter) {
+    redirect(`/admin/settings?footer_error=${encodeURIComponent(twitter.error)}`)
+  }
+
   const { error: updateError } = await supabase
     .from('stores')
     .update({
@@ -528,8 +584,10 @@ export async function saveFooterSettings(formData: FormData): Promise<void> {
       footer_phone: parseOptionalText(formData.get('footerPhone')),
       footer_address: parseOptionalText(formData.get('footerAddress')),
       footer_whatsapp: parseOptionalText(formData.get('footerWhatsapp')),
-      footer_instagram: parseOptionalText(formData.get('footerInstagram')),
-      footer_facebook: parseOptionalText(formData.get('footerFacebook')),
+      footer_instagram: instagram.value,
+      footer_facebook: facebook.value,
+      footer_tiktok: tiktok.value,
+      footer_twitter: twitter.value,
     })
     .eq('id', store.id)
     .eq('owner_id', user.id)
@@ -1913,7 +1971,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
                   />
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-3">
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                   <div className="space-y-2">
                     <Label htmlFor="footerWhatsapp">WhatsApp</Label>
                     <Input
@@ -1924,21 +1982,43 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="footerInstagram">Instagram</Label>
+                    <Label htmlFor="footerInstagram">Instagram URL</Label>
                     <Input
                       id="footerInstagram"
                       name="footerInstagram"
+                      type="url"
                       defaultValue={store.footer_instagram ?? ''}
                       placeholder="https://instagram.com/tutienda"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="footerFacebook">Facebook</Label>
+                    <Label htmlFor="footerFacebook">Facebook URL</Label>
                     <Input
                       id="footerFacebook"
                       name="footerFacebook"
+                      type="url"
                       defaultValue={store.footer_facebook ?? ''}
                       placeholder="https://facebook.com/tutienda"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="footerTiktok">TikTok URL</Label>
+                    <Input
+                      id="footerTiktok"
+                      name="footerTiktok"
+                      type="url"
+                      defaultValue={store.footer_tiktok ?? ''}
+                      placeholder="https://tiktok.com/@tutienda"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="footerTwitter">X (Twitter) URL</Label>
+                    <Input
+                      id="footerTwitter"
+                      name="footerTwitter"
+                      type="url"
+                      defaultValue={store.footer_twitter ?? ''}
+                      placeholder="https://x.com/tutienda"
                     />
                   </div>
                 </div>

@@ -12,7 +12,7 @@ import type {
 import { isLikelyDirectImageUrl } from '@/lib/storefront'
 
 const STOREFRONT_STORE_SELECT =
-  'id, name, slug, logo_url, favicon_url, hero_image_url, description, free_shipping_threshold, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook'
+  'id, name, slug, logo_url, favicon_url, hero_image_url, description, free_shipping_threshold, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook, footer_tiktok, footer_twitter'
 
 function normalizeOptionalText(value: string | null | undefined): string | null {
   const trimmed = value?.trim()
@@ -55,6 +55,8 @@ function mapStoreRow(store: {
   footer_whatsapp: string | null
   footer_instagram: string | null
   footer_facebook: string | null
+  footer_tiktok: string | null
+  footer_twitter: string | null
 }): StorefrontStore {
   return {
     id: store.id,
@@ -71,6 +73,8 @@ function mapStoreRow(store: {
     footerWhatsapp: normalizeOptionalText(store.footer_whatsapp),
     footerInstagram: normalizeOptionalText(store.footer_instagram),
     footerFacebook: normalizeOptionalText(store.footer_facebook),
+    footerTiktok: normalizeOptionalText(store.footer_tiktok),
+    footerTwitter: normalizeOptionalText(store.footer_twitter),
   }
 }
 

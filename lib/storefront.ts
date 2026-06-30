@@ -13,6 +13,8 @@ export type StorefrontStore = {
   footerWhatsapp: string | null
   footerInstagram: string | null
   footerFacebook: string | null
+  footerTiktok: string | null
+  footerTwitter: string | null
 }
 
 export type StorefrontRecentPurchase = {

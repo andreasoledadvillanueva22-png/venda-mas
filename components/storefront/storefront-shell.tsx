@@ -5,10 +5,11 @@ import Link from 'next/link'
 import { Search, User, ShoppingCart, Store, Mail, Phone, MapPin } from 'lucide-react'
 import { useCart } from '@/lib/cart-context'
 import type { StorefrontRecentPurchase, StorefrontStore } from '@/lib/storefront'
-import { buildWhatsappUrl, normalizeSocialUrl, storefrontHref } from '@/lib/storefront'
+import { buildWhatsappUrl, storefrontHref } from '@/lib/storefront'
 import { cn } from '@/lib/utils'
 import { FloatingWhatsappButton } from '@/components/storefront/floating-whatsapp-button'
 import { RecentPurchaseNotifications } from '@/components/storefront/recent-purchase-notifications'
+import { SocialIcons } from '@/components/storefront/social-icons'
 import { Logo } from '@/components/ui/logo'
 import type { ThemeColors } from '@/lib/store-design'
 import { DEFAULT_THEME_COLORS } from '@/lib/store-design'
@@ -61,7 +62,12 @@ export function StorefrontShell({
       store?.footerWhatsapp,
   )
 
-  const hasSocialLinks = Boolean(store?.footerInstagram || store?.footerFacebook)
+  const hasSocialLinks = Boolean(
+    store?.footerInstagram ||
+      store?.footerFacebook ||
+      store?.footerTiktok ||
+      store?.footerTwitter,
+  )
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8)
@@ -172,30 +178,12 @@ export function StorefrontShell({
                   'Productos de calidad con envío a toda Argentina. Compra segura con múltiples medios de pago.'}
               </p>
               {hasSocialLinks ? (
-                <div className="flex flex-wrap gap-3">
-                  {store?.footerInstagram ? (
-                    <a
-                      href={normalizeSocialUrl(store.footerInstagram, 'https://instagram.com/')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-slate-400 transition hover:text-white"
-                      aria-label="Instagram"
-                    >
-                      Instagram
-                    </a>
-                  ) : null}
-                  {store?.footerFacebook ? (
-                    <a
-                      href={normalizeSocialUrl(store.footerFacebook, 'https://facebook.com/')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-slate-400 transition hover:text-white"
-                      aria-label="Facebook"
-                    >
-                      Facebook
-                    </a>
-                  ) : null}
-                </div>
+                <SocialIcons
+                  instagram={store?.footerInstagram}
+                  facebook={store?.footerFacebook}
+                  tiktok={store?.footerTiktok}
+                  twitter={store?.footerTwitter}
+                />
               ) : null}
             </div>
             <div className="space-y-4">
