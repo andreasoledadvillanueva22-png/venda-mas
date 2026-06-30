@@ -75,6 +75,7 @@ export async function saveStoreDesignSettings(
   }
 
   revalidatePath('/admin/design')
+  revalidatePath('/storefront', 'layout')
   return { success: true }
 }
 

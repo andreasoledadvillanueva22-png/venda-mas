@@ -1,9 +1,11 @@
 import type { Metadata } from 'next'
 import {
   getRecentPurchaseNotifications,
+  getStoreDesignSettings,
   resolveStorefrontStore,
 } from '@/lib/storefront-server'
 import { DEFAULT_STOREFRONT_FAVICON } from '@/lib/storefront'
+import { DEFAULT_THEME_COLORS } from '@/lib/store-design'
 import { StorefrontShell } from '@/components/storefront/storefront-shell'
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -30,9 +32,10 @@ export default async function StorefrontLayout({
 }) {
   const store = await resolveStorefrontStore()
   const recentPurchases = store ? await getRecentPurchaseNotifications(store.id) : []
+  const designColors = store ? await getStoreDesignSettings(store.id) : DEFAULT_THEME_COLORS
 
   return (
-    <StorefrontShell store={store} recentPurchases={recentPurchases}>
+    <StorefrontShell store={store} recentPurchases={recentPurchases} designColors={designColors}>
       {children}
     </StorefrontShell>
   )

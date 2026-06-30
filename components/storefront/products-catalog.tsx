@@ -46,7 +46,7 @@ function formatPrice(value: number) {
 
 function getProductBadge(product: CatalogProduct): { label: string; className: string } | null {
   if (product.featured) {
-    return { label: 'Destacado', className: 'bg-red-600' }
+    return { label: 'Destacado', className: 'sf-bg-primary' }
   }
   if (product.compareAtPrice && product.compareAtPrice > product.price) {
     return { label: 'Oferta', className: 'bg-emerald-600' }
@@ -313,7 +313,7 @@ export function ProductsCatalog({
                         <Button
                           type="button"
                           size="sm"
-                          className="touch-manipulation rounded-xl bg-red-600 font-semibold shadow-lg hover:bg-red-700 hover:shadow-xl"
+                          className="sf-btn-primary touch-manipulation rounded-xl font-semibold shadow-lg hover:shadow-xl"
                           onClick={() =>
                             addToCart({
                               id: product.id,

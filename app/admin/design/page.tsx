@@ -4,25 +4,10 @@ import { getOwnerStore } from '@/lib/admin-store'
 import { loadStoreDesignSettings } from '@/app/admin/design/actions'
 import {
   DEFAULT_HOMEPAGE_CONFIG,
-  DEFAULT_THEME_COLORS,
+  parseThemeColors,
   type HomepageConfig,
   type StoreDesignSettings,
-  type ThemeColors,
 } from '@/lib/store-design'
-
-function parseThemeColors(value: unknown): ThemeColors {
-  if (!value || typeof value !== 'object') {
-    return DEFAULT_THEME_COLORS
-  }
-
-  const colors = value as Partial<ThemeColors>
-  return {
-    primary: colors.primary ?? DEFAULT_THEME_COLORS.primary,
-    secondary: colors.secondary ?? DEFAULT_THEME_COLORS.secondary,
-    background: colors.background ?? DEFAULT_THEME_COLORS.background,
-    text: colors.text ?? DEFAULT_THEME_COLORS.text,
-  }
-}
 
 function parseHomepageConfig(value: unknown): HomepageConfig {
   if (!value || typeof value !== 'object') {

@@ -10,10 +10,13 @@ import { cn } from '@/lib/utils'
 import { FloatingWhatsappButton } from '@/components/storefront/floating-whatsapp-button'
 import { RecentPurchaseNotifications } from '@/components/storefront/recent-purchase-notifications'
 import { Logo } from '@/components/ui/logo'
+import type { ThemeColors } from '@/lib/store-design'
+import { DEFAULT_THEME_COLORS } from '@/lib/store-design'
 
 type StorefrontShellProps = {
   store: StorefrontStore | null
   recentPurchases?: StorefrontRecentPurchase[]
+  designColors?: ThemeColors
   children: React.ReactNode
 }
 
@@ -35,7 +38,12 @@ function StoreLogo({ store }: { store: StorefrontStore }) {
   )
 }
 
-export function StorefrontShell({ store, recentPurchases = [], children }: StorefrontShellProps) {
+export function StorefrontShell({
+  store,
+  recentPurchases = [],
+  designColors = DEFAULT_THEME_COLORS,
+  children,
+}: StorefrontShellProps) {
   const { totalItems, setIsCartOpen } = useCart()
   const [scrolled, setScrolled] = useState(false)
   const storeSlug = store?.slug ?? null
@@ -63,7 +71,17 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col bg-brand-50/30">
+    <div
+      className="flex min-h-screen flex-col bg-brand-50/30"
+      style={
+        {
+          '--store-primary': designColors.primary,
+          '--store-secondary': designColors.secondary,
+          '--store-background': designColors.background,
+          '--store-text': designColors.text,
+        } as React.CSSProperties
+      }
+    >
       <div className="bg-gray-900 py-2 text-center text-sm text-white">
         Envío gratis en compras superiores a ${formattedThreshold}
       </div>
@@ -92,18 +110,18 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
             </Link>
 
             <nav className="hidden items-center gap-8 md:flex">
-              <Link href={homeHref} className="text-sm font-semibold text-brand-900 transition hover:text-red-600">
+              <Link href={homeHref} className="sf-nav-link text-sm font-semibold text-brand-900 transition">
                 INICIO
               </Link>
               <Link
                 href={productsHref}
-                className="text-sm font-semibold text-brand-900 transition hover:text-red-600"
+                className="sf-nav-link text-sm font-semibold text-brand-900 transition"
               >
                 PRODUCTOS
               </Link>
               <Link
                 href={productsHref}
-                className="text-sm font-semibold text-brand-900 transition hover:text-red-600"
+                className="sf-nav-link text-sm font-semibold text-brand-900 transition"
               >
                 CATEGORÍAS
               </Link>
@@ -132,7 +150,7 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
               >
                 <ShoppingCart className="h-5 w-5" />
                 {totalItems > 0 && (
-                  <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-xs font-bold text-white">
+                  <span className="sf-bg-primary absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold text-white">
                     {totalItems}
                   </span>
                 )}

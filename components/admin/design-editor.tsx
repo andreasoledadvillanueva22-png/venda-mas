@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import {
   Check,
   Edit,
@@ -27,35 +28,11 @@ import {
   DEFAULT_THEME_COLORS,
   FONT_OPTIONS,
   googleFontFamily,
+  PREDEFINED_THEMES,
   type StoreDesignSettings,
 } from '@/lib/store-design'
 
-const themes = [
-  {
-    id: 'moderno',
-    name: 'Moderno',
-    description: 'Rojo y blanco',
-    colors: ['#DC2626', '#ffffff', '#111827'],
-  },
-  {
-    id: 'elegante',
-    name: 'Elegante',
-    description: 'Negro y dorado',
-    colors: ['#111827', '#F59E0B', '#F8F1E5'],
-  },
-  {
-    id: 'natural',
-    name: 'Natural',
-    description: 'Verde y beige',
-    colors: ['#16A34A', '#F5F5DC', '#2D5C45'],
-  },
-  {
-    id: 'minimalista',
-    name: 'Minimalista',
-    description: 'Gris y blanco',
-    colors: ['#475569', '#F8FAFC', '#020617'],
-  },
-]
+const themes = PREDEFINED_THEMES
 
 const fontOptions = [...FONT_OPTIONS]
 
@@ -64,12 +41,14 @@ type DesignEditorProps = {
 }
 
 export function DesignEditor({ initial }: DesignEditorProps) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('tema')
   const [selectedTheme, setSelectedTheme] = useState(initial.themeId)
   const [showPreview, setShowPreview] = useState(false)
   const [showHeroModal, setShowHeroModal] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
+  const [themeMessage, setThemeMessage] = useState<string | null>(null)
   const [isSaving, startSaveTransition] = useTransition()
 
   const [colors, setColors] = useState(initial.colors)
@@ -89,6 +68,19 @@ export function DesignEditor({ initial }: DesignEditorProps) {
   const currentTheme = themes.find((theme) => theme.id === selectedTheme)
   const titleFontFamily = googleFontFamily(fontTitle)
   const bodyFontFamily = googleFontFamily(fontBody)
+
+  function applyPredefinedTheme(themeId: string) {
+    const theme = themes.find((item) => item.id === themeId)
+    if (!theme) {
+      return
+    }
+
+    setSelectedTheme(themeId)
+    setColors({ ...theme.colors })
+    setSaveMessage(null)
+    setSaveError(null)
+    setThemeMessage('Tema aplicado. Hacé clic en "Guardar cambios" para aplicar.')
+  }
 
   function handleSave() {
     setSaveMessage(null)
@@ -115,6 +107,8 @@ export function DesignEditor({ initial }: DesignEditorProps) {
       }
 
       setSaveMessage('Cambios guardados correctamente.')
+      setThemeMessage(null)
+      router.refresh()
     })
   }
 
@@ -146,6 +140,11 @@ export function DesignEditor({ initial }: DesignEditorProps) {
             {saveMessage}
           </p>
         ) : null}
+        {themeMessage ? (
+          <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-800">
+            {themeMessage}
+          </p>
+        ) : null}
         {saveError ? (
           <p className="mt-3 rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-700">
             {saveError}
@@ -174,10 +173,8 @@ export function DesignEditor({ initial }: DesignEditorProps) {
                   <CardContent>
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                       {themes.map((theme) => (
-                        <button
+                        <div
                           key={theme.id}
-                          type="button"
-                          onClick={() => setSelectedTheme(theme.id)}
                           className={`group overflow-hidden rounded-3xl border p-4 text-left transition ${
                             selectedTheme === theme.id
                               ? 'border-red-500 bg-red-50'
@@ -194,23 +191,21 @@ export function DesignEditor({ initial }: DesignEditorProps) {
                             ) : null}
                           </div>
                           <div className="mt-4 flex h-24 items-center gap-3 rounded-3xl border border-slate-200 p-3">
-                            {theme.colors.map((color) => (
+                            {theme.previewColors.map((color) => (
                               <div key={color} className="h-10 w-10 rounded-full" style={{ backgroundColor: color }} />
                             ))}
                           </div>
                           <div className="mt-4">
                             <Button
+                              type="button"
                               variant={selectedTheme === theme.id ? 'default' : 'secondary'}
                               className="w-full"
-                              onClick={(event) => {
-                                event.stopPropagation()
-                                setSelectedTheme(theme.id)
-                              }}
+                              onClick={() => applyPredefinedTheme(theme.id)}
                             >
                               Aplicar
                             </Button>
                           </div>
-                        </button>
+                        </div>
                       ))}
                     </div>
                   </CardContent>

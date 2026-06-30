@@ -21,8 +21,6 @@ import type { StorefrontTestimonial } from '@/lib/storefront'
 import { buildWhatsappUrl, storefrontHref } from '@/lib/storefront'
 import { stripHtmlToPlainText } from '@/lib/product-description'
 
-const BRAND_RED = '#FC0303'
-
 const CATEGORY_COLORS = [
   'from-blue-500 to-blue-700',
   'from-green-500 to-green-700',
@@ -57,7 +55,7 @@ function formatPrice(value: number) {
 
 function getProductBadge(product: CatalogProduct): { label: string; className: string } | null {
   if (product.featured) {
-    return { label: 'Destacado', className: 'bg-red-600' }
+    return { label: 'Destacado', className: 'sf-bg-primary text-white' }
   }
   if (product.compareAtPrice && product.compareAtPrice > product.price) {
     return { label: 'Oferta', className: 'bg-emerald-600' }
@@ -180,9 +178,9 @@ function HeroVisual({
     <div className="flex aspect-[4/3] w-full flex-col items-center justify-center rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 via-white to-slate-100 p-8 text-center shadow-md lg:aspect-square">
       <div
         className="flex h-20 w-20 items-center justify-center rounded-full"
-        style={{ backgroundColor: `${BRAND_RED}15` }}
+        style={{ backgroundColor: 'color-mix(in srgb, var(--store-primary, #dc2626) 8%, transparent)' }}
       >
-        <Store className="h-10 w-10" style={{ color: BRAND_RED }} />
+        <Store className="sf-text-primary h-10 w-10" />
       </div>
       <p className="mt-5 text-2xl font-bold text-slate-900">{storeName}</p>
       <p className="mt-2 text-sm text-slate-500">Tu tienda online de confianza</p>
@@ -260,7 +258,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
               <h1 className="text-4xl font-bold leading-tight text-slate-900 sm:text-5xl lg:text-6xl">
                 Bienvenidos a
                 <br />
-                <span style={{ color: BRAND_RED }}>{storeName}</span>
+                <span className="sf-text-primary">{storeName}</span>
               </h1>
               <p className="max-w-xl text-lg text-slate-600">
                 Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago
@@ -269,8 +267,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
               <div className="flex flex-wrap gap-4">
                 <Link
                   href={productsHref}
-                  className="inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
-                  style={{ backgroundColor: BRAND_RED }}
+                  className="sf-bg-primary inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
                 >
                   Ver productos
                   <ArrowRight className="ml-2 h-4 w-4" />
@@ -297,7 +294,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
         <section className="bg-white py-16 sm:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+              <p className="text-sm font-semibold uppercase tracking-widest sf-text-primary">
                 COMPRAR POR CATEGORÍA
               </p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -327,7 +324,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       <section className="bg-brand-50/30 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+            <p className="text-sm font-semibold uppercase tracking-widest sf-text-primary">
               LO MÁS VENDIDO
             </p>
             <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -374,7 +371,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                           )}
                         </div>
                         <div className="p-4 pb-0">
-                          <h3 className="mb-2 line-clamp-2 font-semibold text-slate-900 group-hover:text-red-600">
+                          <h3 className="mb-2 line-clamp-2 font-semibold text-slate-900 group-hover:text-[var(--store-primary)]">
                             {product.name}
                           </h3>
                           <p className="mb-3 line-clamp-2 text-sm text-slate-500">
@@ -404,8 +401,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
           <div className="mt-12 text-center">
             <Link
               href={productsHref}
-              className="inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
-              style={{ backgroundColor: BRAND_RED }}
+              className="sf-bg-primary inline-flex items-center rounded-md px-8 py-3 text-lg font-medium text-white transition hover:opacity-90"
             >
               Ver todos los productos
               <ArrowRight className="ml-2 h-4 w-4" />
@@ -419,7 +415,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
         <section className="bg-white py-16 sm:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+              <p className="text-sm font-semibold uppercase tracking-widest sf-text-primary">
                 PROMOCIONES
               </p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -452,15 +448,12 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                               {product.name.charAt(0).toUpperCase()}
                             </div>
                           )}
-                          <Badge
-                            className="absolute left-3 top-3 text-white"
-                            style={{ backgroundColor: BRAND_RED }}
-                          >
+                          <Badge className="sf-bg-primary absolute left-3 top-3 text-white">
                             {hasDiscount ? 'OFERTA' : 'PROMO'}
                           </Badge>
                         </div>
                         <div className="p-5">
-                          <h3 className="mb-3 line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-red-600">
+                          <h3 className="mb-3 line-clamp-2 text-lg font-semibold text-slate-900 group-hover:text-[var(--store-primary)]">
                             {product.name}
                           </h3>
                           <div className="flex items-center gap-3">
@@ -469,12 +462,12 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                                 <span className="text-sm text-slate-400 line-through">
                                   {formatPrice(product.compareAtPrice ?? product.price)}
                                 </span>
-                                <span className="text-xl font-bold" style={{ color: BRAND_RED }}>
+                                <span className="text-xl font-bold sf-text-primary">
                                   {formatPrice(product.price)}
                                 </span>
                               </>
                             ) : (
-                              <span className="text-xl font-bold" style={{ color: BRAND_RED }}>
+                              <span className="text-xl font-bold sf-text-primary">
                                 {formatPrice(product.price)}
                               </span>
                             )}
@@ -504,7 +497,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
         <section className="bg-brand-50/30 py-16 sm:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
-              <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+              <p className="text-sm font-semibold uppercase tracking-widest sf-text-primary">
                 OPINIONES
               </p>
               <h2 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -544,7 +537,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       <section className="bg-slate-900 py-16 text-white sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
+            <p className="text-sm font-semibold uppercase tracking-widest sf-text-primary">
               NEWSLETTER
             </p>
             <h2 className="mt-2 text-3xl font-bold sm:text-4xl">
@@ -559,10 +552,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                 placeholder="Ingresá tu email"
                 className="flex-1 rounded-full bg-white/10 px-6 py-3 text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500"
               />
-              <Button
-                className="rounded-full px-8 py-3 text-white hover:opacity-90"
-                style={{ backgroundColor: BRAND_RED }}
-              >
+              <Button className="sf-bg-primary rounded-full px-8 py-3 text-white hover:opacity-90">
                 Suscribirme
               </Button>
             </div>

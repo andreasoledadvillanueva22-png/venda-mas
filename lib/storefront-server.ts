@@ -1,6 +1,8 @@
 import { headers } from 'next/headers'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { createClient } from '@/lib/supabase/server'
 import { getStoreBySlug } from '@/lib/tenant'
+import { parseThemeColors, type ThemeColors } from '@/lib/store-design'
 import type {
   StorefrontProductReview,
   StorefrontRecentPurchase,
@@ -230,4 +232,23 @@ export async function getProductReviews(
     source: row.source as StorefrontProductReview['source'],
     sourceUrl: row.source_url?.trim() || null,
   }))
+}
+
+export async function getStoreDesignSettings(storeId: string): Promise<ThemeColors> {
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from('store_design_settings')
+      .select('theme_colors')
+      .eq('store_id', storeId)
+      .maybeSingle()
+
+    if (error || !data) {
+      return parseThemeColors(null)
+    }
+
+    return parseThemeColors(data.theme_colors)
+  } catch {
+    return parseThemeColors(null)
+  }
 }
