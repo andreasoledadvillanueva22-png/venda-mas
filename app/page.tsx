@@ -2,7 +2,10 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { Rocket, Smartphone, CreditCard } from 'lucide-react'
 import { WaitlistForm } from '@/components/marketing/waitlist-form'
-import { Logo } from '@/components/ui/logo'
+import { MarketingHeader } from '@/components/marketing/marketing-header'
+import { MarketingFooter } from '@/components/marketing/marketing-footer'
+import { PricingCard } from '@/components/pricing/pricing-card'
+import { fetchPublicPlans } from '@/lib/plans-server'
 
 export const metadata: Metadata = {
   title: 'VendaMás — Vendé online en minutos y sin comisiones por venta',
@@ -28,7 +31,12 @@ const features = [
   },
 ] as const
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const plans = await fetchPublicPlans()
+  const highlightedPlans = plans.filter((plan) =>
+    ['emprendedor', 'negocio', 'empresa'].includes(plan.slug),
+  )
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-br from-brand-800 via-brand-600 to-brand-400 text-white">
       <div
@@ -44,19 +52,7 @@ export default function LandingPage() {
         className="pointer-events-none absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-brand-400 opacity-20 blur-3xl sm:h-80 sm:w-80"
       />
 
-      <header className="relative z-10 border-b border-white/10 bg-white/5 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <Link href="/" className="inline-flex rounded-lg bg-white/95 px-2 py-1 shadow-sm">
-            <Logo size="md" priority />
-          </Link>
-          <Link
-            href="/auth/login"
-            className="rounded-lg border border-white/40 bg-transparent px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
-          >
-            Ya soy usuario
-          </Link>
-        </div>
-      </header>
+      <MarketingHeader />
 
       <main className="relative z-10">
         <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:py-28">
@@ -73,7 +69,10 @@ export default function LandingPage() {
             </p>
           </div>
 
-          <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-lg sm:p-8">
+          <div
+            id="waitlist"
+            className="mx-auto mt-12 max-w-2xl scroll-mt-24 rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-lg sm:p-8"
+          >
             <p className="mb-5 text-center text-sm font-semibold uppercase tracking-wide text-white/80">
               Unite a la lista de acceso anticipado
             </p>
@@ -108,6 +107,34 @@ export default function LandingPage() {
         </section>
 
         <section className="border-t border-white/10 bg-white/5 py-16 backdrop-blur-sm sm:py-20">
+          <div className="mx-auto max-w-6xl px-4 sm:px-6">
+            <div className="mx-auto max-w-2xl text-center">
+              <h2 className="text-3xl font-bold tracking-tight text-white sm:text-4xl">
+                Planes simples y transparentes
+              </h2>
+              <p className="mt-4 text-white/80">
+                Elegí el plan que mejor se adapte a tu etapa. Sin comisiones por venta.
+              </p>
+            </div>
+
+            <div className="mt-12 grid gap-6 lg:grid-cols-3">
+              {highlightedPlans.map((plan) => (
+                <PricingCard key={plan.id} plan={plan} isYearly={false} compact />
+              ))}
+            </div>
+
+            <div className="mt-10 text-center">
+              <Link
+                href="/pricing"
+                className="inline-flex items-center justify-center rounded-xl border border-white/30 bg-white/10 px-6 py-3 text-sm font-semibold text-white transition hover:bg-white/20"
+              >
+                Ver todos los planes
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section className="border-t border-white/10 bg-white/5 py-16 backdrop-blur-sm sm:py-20">
           <div className="mx-auto max-w-4xl px-4 text-center sm:px-6">
             <p className="text-lg font-medium text-white sm:text-xl">
               Unite a los primeros emprendedores que están revolucionando sus ventas.
@@ -119,20 +146,7 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="relative z-10 border-t border-white/10 bg-white/5 backdrop-blur-md">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-white/70 sm:flex-row sm:px-6">
-          <p>© {new Date().getFullYear()} VendaMás. Todos los derechos reservados.</p>
-          <div className="flex items-center gap-5">
-            <Link href="/auth/login" className="transition hover:text-white">
-              Ya soy usuario
-            </Link>
-            <span className="text-white/30">|</span>
-            <Link href="#" className="transition hover:text-white">
-              Términos
-            </Link>
-          </div>
-        </div>
-      </footer>
+      <MarketingFooter />
     </div>
   )
 }

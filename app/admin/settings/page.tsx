@@ -23,7 +23,10 @@ import {
 import { cn } from '@/lib/utils'
 import { isStoreSlugTaken, validateStoreSlug } from '@/lib/slug'
 import { StoreSlugField } from '@/components/admin/store-slug-field'
+import { CurrentPlanCard } from '@/components/admin/current-plan-card'
 import Link from 'next/link'
+import { fetchStorePlanContext } from '@/lib/plans-server'
+import type { Plan, StoreSubscription } from '@/lib/plans'
 
 type DbProfile = {
   id: string
@@ -70,6 +73,7 @@ type DbStore = {
   footer_facebook: string | null
   footer_tiktok: string | null
   footer_twitter: string | null
+  plan_id: string | null
 }
 
 type DbTestimonial = {
@@ -98,6 +102,8 @@ type SettingsData = {
   store: DbStore
   testimonials: DbTestimonial[]
   fakePurchaseNotifications: DbFakePurchaseNotification[]
+  currentPlan: Plan
+  subscription: StoreSubscription | null
 }
 
 type SettingsPageProps = {
@@ -319,7 +325,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook, footer_tiktok, footer_twitter',
+      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook, footer_tiktok, footer_twitter, plan_id',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -347,12 +353,20 @@ async function getSettingsData(): Promise<SettingsData | null> {
     fakePurchaseNotifications = (data ?? []) as DbFakePurchaseNotification[]
   }
 
+  const { plan: currentPlan, subscription } = await fetchStorePlanContext(
+    store.id,
+    user.id,
+    store.plan_id,
+  )
+
   return {
     email: user.email,
     profile: profile as DbProfile,
     store: store as DbStore,
     testimonials: (testimonials ?? []) as DbTestimonial[],
     fakePurchaseNotifications,
+    currentPlan,
+    subscription,
   }
 }
 
@@ -1562,7 +1576,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     redirect('/auth/login?redirect=/admin/settings')
   }
 
-  const { email, profile, store, testimonials, fakePurchaseNotifications } = settings
+  const { email, profile, store, testimonials, fakePurchaseNotifications, currentPlan, subscription } =
+    settings
   const primaryColor = store.primary_color ?? DEFAULT_PRIMARY_COLOR
   const secondaryColor = store.secondary_color ?? DEFAULT_SECONDARY_COLOR
   const hasMercadoPagoCredentials = Boolean(store.mp_access_token && store.mp_public_key)
@@ -1747,6 +1762,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         </form>
 
         <div className="space-y-6">
+          <CurrentPlanCard plan={currentPlan} subscription={subscription} />
+
           <Card>
             <CardHeader>
               <CardTitle>Perfil de usuario</CardTitle>
