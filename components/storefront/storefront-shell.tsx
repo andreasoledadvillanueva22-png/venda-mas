@@ -63,8 +63,8 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
-      <div className="bg-slate-900 py-2 text-center text-sm text-white">
+    <div className="flex min-h-screen flex-col bg-brand-50/30">
+      <div className="bg-gray-900 py-2 text-center text-sm text-white">
         Envío gratis en compras superiores a ${formattedThreshold}
       </div>
 
@@ -72,8 +72,8 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
         className={cn(
           'sticky top-0 z-30 border-b transition-all duration-300',
           scrolled
-            ? 'border-slate-200/80 bg-white/80 shadow-sm backdrop-blur-lg'
-            : 'border-transparent bg-white',
+            ? 'border-brand-100 bg-white/80 shadow-sm backdrop-blur-lg'
+            : 'border-transparent bg-white/60 backdrop-blur-sm',
         )}
       >
         <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
@@ -86,24 +86,24 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
                   <Store className="h-5 w-5" />
                 </div>
               )}
-              <span className="hidden max-w-[14rem] truncate text-xl font-bold tracking-wider text-slate-900 sm:inline lg:max-w-xs">
+              <span className="hidden max-w-[14rem] truncate text-xl font-bold tracking-wider text-brand-900 sm:inline lg:max-w-xs">
                 {storeName}
               </span>
             </Link>
 
             <nav className="hidden items-center gap-8 md:flex">
-              <Link href={homeHref} className="text-sm font-semibold text-slate-900 transition hover:text-red-600">
+              <Link href={homeHref} className="text-sm font-semibold text-brand-900 transition hover:text-red-600">
                 INICIO
               </Link>
               <Link
                 href={productsHref}
-                className="text-sm font-semibold text-slate-900 transition hover:text-red-600"
+                className="text-sm font-semibold text-brand-900 transition hover:text-red-600"
               >
                 PRODUCTOS
               </Link>
               <Link
                 href={productsHref}
-                className="text-sm font-semibold text-slate-900 transition hover:text-red-600"
+                className="text-sm font-semibold text-brand-900 transition hover:text-red-600"
               >
                 CATEGORÍAS
               </Link>
@@ -112,14 +112,14 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
             <div className="flex items-center gap-3">
               <button
                 type="button"
-                className="rounded-full bg-slate-100 p-3 text-slate-900 transition hover:bg-slate-200"
+                className="rounded-full bg-brand-50 p-3 text-brand-900 transition hover:bg-brand-100"
                 aria-label="Buscar"
               >
                 <Search className="h-5 w-5" />
               </button>
               <button
                 type="button"
-                className="hidden rounded-full bg-slate-100 p-3 text-slate-900 transition hover:bg-slate-200 sm:block"
+                className="hidden rounded-full bg-brand-50 p-3 text-brand-900 transition hover:bg-brand-100 sm:block"
                 aria-label="Mi cuenta"
               >
                 <User className="h-5 w-5" />
@@ -128,7 +128,7 @@ export function StorefrontShell({ store, recentPurchases = [], children }: Store
                 type="button"
                 aria-label="Abrir carrito"
                 onClick={() => setIsCartOpen(true)}
-                className="relative touch-manipulation rounded-full bg-slate-100 p-3 text-slate-900 transition hover:bg-slate-200"
+                className="relative touch-manipulation rounded-full bg-brand-50 p-3 text-brand-900 transition hover:bg-brand-100"
               >
                 <ShoppingCart className="h-5 w-5" />
                 {totalItems > 0 && (

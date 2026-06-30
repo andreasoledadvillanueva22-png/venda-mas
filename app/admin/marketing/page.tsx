@@ -5,6 +5,7 @@ import { CreateDiscountDialog } from '@/components/admin/create-discount-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { cn } from '@/lib/utils'
 import {
   Table,
@@ -264,7 +265,14 @@ export async function createDiscount(formData: FormData): Promise<{ error?: stri
     return { error: 'No se encontró tu tienda.' }
   }
 
-  const { error: insertError } = await supabase.from('discounts').insert({
+  let admin
+  try {
+    admin = createAdminClient()
+  } catch {
+    return { error: 'Falta configurar SUPABASE_SERVICE_ROLE_KEY en el servidor.' }
+  }
+
+  const { error: insertError } = await admin.from('discounts').insert({
     store_id: store.id,
     code: normalizedCode,
     type: discountType,
@@ -276,11 +284,12 @@ export async function createDiscount(formData: FormData): Promise<{ error?: stri
   })
 
   if (insertError) {
+    console.error('[createDiscount]', insertError)
     if (insertError.code === '23505') {
       return { error: 'Ese código ya existe. Elegí otro.' }
     }
 
-    return { error: 'No se pudo crear el descuento. Intentá de nuevo.' }
+    return { error: insertError.message || 'No se pudo crear el descuento. Intentá de nuevo.' }
   }
 
   revalidatePath('/admin/marketing')

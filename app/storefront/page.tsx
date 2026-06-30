@@ -247,7 +247,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
   return (
     <div>
       {/* HERO */}
-      <section className="overflow-hidden bg-gray-50">
+      <section className="overflow-hidden bg-brand-50/50">
         <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 sm:py-20 lg:px-8 lg:py-28">
           <div className="grid items-center gap-12 lg:grid-cols-2">
             <div className="space-y-6">
@@ -324,7 +324,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
       ) : null}
 
       {/* PRODUCTOS DESTACADOS */}
-      <section className="bg-slate-50 py-16 sm:py-20">
+      <section className="bg-brand-50/30 py-16 sm:py-20">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
@@ -349,7 +349,10 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                 const imageUrl = product.images[0] ?? ''
 
                 return (
-                  <Card key={product.id} className="group overflow-hidden transition-shadow hover:shadow-xl">
+                  <Card
+                    key={product.id}
+                    className="group overflow-hidden rounded-2xl border-brand-100/80 shadow-lg shadow-brand-100/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-100/60"
+                  >
                     <CardContent className="p-0">
                       <Link href={productHref(product.id)} className="block">
                         <div className="relative aspect-square overflow-hidden bg-slate-100">
@@ -433,7 +436,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                 return (
                   <Card
                     key={product.id}
-                    className="group overflow-hidden rounded-2xl border border-slate-100 shadow-md transition-shadow hover:shadow-xl"
+                    className="group overflow-hidden rounded-2xl border-brand-100/80 shadow-lg shadow-brand-100/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-100/60"
                   >
                     <CardContent className="p-0">
                       <Link href={productHref(product.id)} className="block">
@@ -498,7 +501,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
 
       {/* TESTIMONIOS */}
       {testimonials.length > 0 ? (
-        <section className="bg-slate-50 py-16 sm:py-20">
+        <section className="bg-brand-50/30 py-16 sm:py-20">
           <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
             <div className="text-center">
               <p className="text-sm font-semibold uppercase tracking-widest" style={{ color: BRAND_RED }}>
@@ -513,7 +516,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
               {testimonials.map((testimonial: StorefrontTestimonial) => (
                 <Card
                   key={testimonial.id}
-                  className="rounded-2xl border border-slate-100 bg-white shadow-md"
+                  className="rounded-2xl border border-brand-100/80 bg-white shadow-lg shadow-brand-100/50"
                 >
                   <CardContent className="space-y-4 p-6">
                     <StarRating rating={testimonial.rating} />

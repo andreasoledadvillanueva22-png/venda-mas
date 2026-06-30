@@ -273,7 +273,7 @@ export function ProductsCatalog({
                 return (
                   <Card
                     key={product.id}
-                    className="overflow-hidden rounded-2xl border-slate-200 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+                    className="overflow-hidden rounded-2xl border-brand-100/80 shadow-lg shadow-brand-100/50 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-brand-100/60"
                   >
                     <CardContent className="p-0">
                       <Link href={productHref(product.id)} className="group block">

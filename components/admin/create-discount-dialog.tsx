@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +29,7 @@ const TYPE_LABELS: Record<DiscountType, string> = {
 }
 
 export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogProps) {
+  const router = useRouter()
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState('')
@@ -68,6 +70,7 @@ export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogPro
       }
 
       handleClose()
+      router.refresh()
     })
   }
 
@@ -82,8 +85,8 @@ export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogPro
       </Button>
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-2xl">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
+          <Card className="my-8 w-full max-w-2xl sm:my-auto">
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Crear descuento</CardTitle>
