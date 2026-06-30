@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,7 @@ const TYPE_LABELS: Record<DiscountType, string> = {
 
 export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogProps) {
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [code, setCode] = useState('')
@@ -39,6 +41,23 @@ export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogPro
   const [maxUses, setMaxUses] = useState('')
   const [expiresAt, setExpiresAt] = useState('')
   const [pending, startTransition] = useTransition()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!open) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [open])
 
   function resetForm() {
     setCode('')
@@ -74,22 +93,21 @@ export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogPro
     })
   }
 
-  return (
-    <>
-      <Button
-        type="button"
-        onClick={() => setOpen(true)}
-        className="bg-red-600 text-white hover:bg-red-700"
+  const modal = open ? (
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="create-discount-title"
+      onClick={handleClose}
+    >
+      <Card
+        className="relative z-[101] max-h-[90vh] w-full max-w-2xl overflow-y-auto shadow-xl"
+        onClick={(event) => event.stopPropagation()}
       >
-        <Plus className="mr-2 h-4 w-4" /> Crear descuento
-      </Button>
-
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:items-center">
-          <Card className="my-8 w-full max-w-2xl sm:my-auto">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Crear descuento</CardTitle>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle id="create-discount-title">Crear descuento</CardTitle>
                 <button
                   type="button"
                   onClick={handleClose}
@@ -224,7 +242,19 @@ export function CreateDiscountDialog({ createDiscount }: CreateDiscountDialogPro
             </form>
           </Card>
         </div>
-      ) : null}
+  ) : null
+
+  return (
+    <>
+      <Button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="bg-red-600 text-white hover:bg-red-700"
+      >
+        <Plus className="mr-2 h-4 w-4" /> Crear descuento
+      </Button>
+
+      {mounted && modal ? createPortal(modal, document.body) : null}
     </>
   )
 }
