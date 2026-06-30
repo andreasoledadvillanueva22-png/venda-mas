@@ -14,12 +14,24 @@ type PricingCardProps = {
   compact?: boolean
 }
 
+function FeatureCheck() {
+  return (
+    <span
+      className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-500 shadow-sm"
+      aria-hidden="true"
+    >
+      <Check className="h-3.5 w-3.5 text-white" strokeWidth={3} />
+    </span>
+  )
+}
+
 export function PricingCard({ plan, isYearly, compact = false }: PricingCardProps) {
   const price = getPlanDisplayPrice(plan, isYearly)
   const cta = getPlanCta(plan)
   const isExternal = cta.href.startsWith('http')
   const periodLabel = isYearly ? '/año' : '/mes'
   const isFree = plan.priceMonthly === 0
+  const showCheaperBadge = plan.slug === 'emprendedor'
 
   return (
     <article
@@ -44,6 +56,12 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
       </div>
 
       <div className="mb-6">
+        {showCheaperBadge ? (
+          <span className="mb-3 inline-flex rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white">
+            50% más barato que Tienda Nube
+          </span>
+        ) : null}
+
         <p className="text-4xl font-bold tracking-tight text-white transition-all duration-300">
           {isFree ? 'Gratis' : formatPlanPrice(price)}
         </p>
@@ -57,8 +75,8 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
       {!compact ? (
         <ul className="mb-8 flex-1 space-y-3">
           {plan.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-2 text-sm text-white/85">
-              <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" aria-hidden="true" />
+            <li key={feature} className="flex items-start gap-3 text-sm text-white/85">
+              <FeatureCheck />
               <span>{feature}</span>
             </li>
           ))}

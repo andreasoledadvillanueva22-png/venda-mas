@@ -12,6 +12,10 @@ type WaitlistFormProps = {
   inputClassName?: string
   buttonClassName?: string
   iconClassName?: string
+  placeholder?: string
+  submitLabel?: string
+  helperText?: string
+  showIcon?: boolean
 }
 
 export function WaitlistForm({
@@ -19,6 +23,10 @@ export function WaitlistForm({
   inputClassName,
   buttonClassName,
   iconClassName,
+  placeholder = 'tu@email.com',
+  submitLabel = 'Quiero vender sin comisiones',
+  helperText,
+  showIcon = true,
 }: WaitlistFormProps) {
   const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
@@ -64,24 +72,27 @@ export function WaitlistForm({
     <div className={className}>
       <form onSubmit={(event) => void handleSubmit(event)} className="flex flex-col gap-3 sm:flex-row">
         <div className="relative flex-1">
-          <Mail
-            className={cn(
-              'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/70',
-              iconClassName,
-            )}
-          />
+          {showIcon ? (
+            <Mail
+              className={cn(
+                'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-white/70',
+                iconClassName,
+              )}
+            />
+          ) : null}
           <Input
             type="email"
             name="email"
             autoComplete="email"
             inputMode="email"
-            placeholder="tu@email.com"
+            placeholder={placeholder}
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             disabled={loading}
             required
             className={cn(
-              'h-12 border-white/30 bg-white/20 pl-10 text-base text-white placeholder:text-white/70 focus-visible:border-white/50 focus-visible:ring-white/20',
+              'h-12 border-white/30 bg-white/20 text-base text-white placeholder:text-white/70 focus-visible:border-white/50 focus-visible:ring-white/20',
+              showIcon ? 'pl-10' : 'px-4',
               inputClassName,
             )}
           />
@@ -100,10 +111,14 @@ export function WaitlistForm({
               Enviando...
             </>
           ) : (
-            'Quiero vender sin comisiones'
+            submitLabel
           )}
         </Button>
       </form>
+
+      {helperText && !success && !error ? (
+        <p className="mt-3 text-sm text-white/75">{helperText}</p>
+      ) : null}
 
       {success ? (
         <p

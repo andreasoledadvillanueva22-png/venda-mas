@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { PricingToggle } from '@/components/pricing/pricing-toggle'
 import { PricingCard } from '@/components/pricing/pricing-card'
 import { FeatureTable } from '@/components/pricing/feature-table'
+import { CompetitorComparison } from '@/components/pricing/competitor-comparison'
 import { PricingFaq } from '@/components/pricing/faq'
 import type { Plan } from '@/lib/plans'
 
@@ -33,6 +34,8 @@ export function PricingSection({
           <PricingCard key={plan.id} plan={plan} isYearly={isYearly} />
         ))}
       </div>
+
+      <CompetitorComparison />
 
       {showComparison ? (
         <section className="mt-20">

@@ -6,6 +6,10 @@ export function MarketingFooter() {
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-white/70 sm:flex-row sm:px-6">
         <p>© {new Date().getFullYear()} VendaMás. Todos los derechos reservados.</p>
         <div className="flex flex-wrap items-center justify-center gap-5">
+          <Link href="/blog" className="transition hover:text-white">
+            Blog
+          </Link>
+          <span className="text-white/30">|</span>
           <Link href="/pricing" className="transition hover:text-white">
             Planes
           </Link>

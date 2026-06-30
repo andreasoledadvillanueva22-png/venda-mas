@@ -8,12 +8,12 @@ INSERT INTO plans (name, slug, price_monthly, price_yearly, description, feature
   TRUE, FALSE, 1),
 
 ('Emprendedor', 'emprendedor', 9900, 99000, 'Ideal para quienes están empezando a vender online',
-  '["Hasta 50 productos", "200 órdenes por mes", "1 usuario", "Dominio personalizado", "Soporte por email", "Sin comisiones por venta", "Cobros online integrados", "Efectivo contra entrega"]'::jsonb,
+  '["Hasta 50 productos", "200 órdenes por mes", "1 usuario", "Dominio personalizado", "Soporte por email", "Sin comisiones por venta", "Tarjeta + Efectivo + Transferencia", "Envíos con Andreani y Correo Argentino (próximamente)"]'::jsonb,
   '{"products": 50, "orders_per_month": 200, "users": 1}'::jsonb,
   TRUE, FALSE, 2),
 
 ('Negocio', 'negocio', 19900, 199000, 'Para negocios en crecimiento que necesitan más',
-  '["Hasta 200 productos", "1000 órdenes por mes", "3 usuarios", "Dominio personalizado", "Soporte prioritario", "Sin comisiones por venta", "Múltiples medios de pago", "Analytics avanzado", "Email marketing", "Cupones y descuentos"]'::jsonb,
+  '["Hasta 200 productos", "1000 órdenes por mes", "3 usuarios", "Dominio personalizado", "Soporte prioritario", "Sin comisiones por venta", "Tarjeta + Efectivo + Transferencia", "Analytics avanzado", "Email marketing", "Cupones y descuentos"]'::jsonb,
   '{"products": 200, "orders_per_month": 1000, "users": 3}'::jsonb,
   TRUE, TRUE, 3),
 
