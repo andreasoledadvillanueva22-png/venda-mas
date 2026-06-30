@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: storeName,
     description:
       store?.description ??
-      'Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago.',
+      'Productos de calidad con envío a toda Argentina. Compra segura con múltiples medios de pago.',
     icons: {
       icon: faviconUrl,
       shortcut: faviconUrl,

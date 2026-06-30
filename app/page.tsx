@@ -5,9 +5,9 @@ import { WaitlistForm } from '@/components/marketing/waitlist-form'
 import { Logo } from '@/components/ui/logo'
 
 export const metadata: Metadata = {
-  title: 'VendaMás — Vendé online en minutos',
+  title: 'VendaMás — Vendé online en minutos y sin comisiones por venta',
   description:
-    'La plataforma todo-en-uno para crear tu tienda online, cobrar con Mercado Pago y gestionar tus envíos.',
+    'Creá tu tienda online, configurá tus medios de cobro y gestioná tus envíos sin regalar tu ganancia.',
 }
 
 const features = [
@@ -19,7 +19,7 @@ const features = [
   {
     icon: CreditCard,
     title: 'Cobros integrados',
-    description: 'Mercado Pago nativo para recibir pagos reales desde el primer día.',
+    description: 'Configurá múltiples medios de pago para recibir cobros reales desde el primer día.',
   },
   {
     icon: Smartphone,
@@ -65,17 +65,17 @@ export default function LandingPage() {
               Próximo lanzamiento · Acceso anticipado
             </p>
             <h1 className="text-4xl font-bold tracking-tight text-white sm:text-5xl md:text-7xl">
-              Vendé online en minutos, sin saber programar.
+              Vendé online en minutos y sin comisiones por venta
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-white/90 sm:text-xl">
-              La plataforma todo-en-uno para crear tu tienda online, cobrar con Mercado Pago y
-              gestionar tus envíos.
+              Creá tu tienda online, configurá tus medios de cobro y gestioná tus envíos sin regalar tu
+              ganancia.
             </p>
           </div>
 
           <div className="mx-auto mt-12 max-w-2xl rounded-2xl border border-white/20 bg-white/10 p-6 backdrop-blur-lg sm:p-8">
             <p className="mb-5 text-center text-sm font-semibold uppercase tracking-wide text-white/80">
-              Unite a la lista de espera
+              Unite a la lista de acceso anticipado
             </p>
             <WaitlistForm buttonClassName="w-full sm:w-auto" />
           </div>

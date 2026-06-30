@@ -12,7 +12,7 @@ import { resolveStorefrontStore, getProductReviews } from '@/lib/storefront-serv
 import { AddToCartButton } from '@/components/storefront/add-to-cart-button'
 import { BuyNowButton } from '@/components/storefront/buy-now-button'
 import { ProductVideo } from '@/components/storefront/product-video'
-import { ProductReviewsList } from '@/components/storefront/product-reviews-list'
+import { ProductReviewsCarousel } from '@/components/storefront/product-reviews-carousel'
 import { ShareProductButton } from '@/components/storefront/share-product-button'
 import { ProductDescription } from '@/components/storefront/product-description'
 import { Badge } from '@/components/ui/badge'
@@ -460,13 +460,13 @@ export default function ProductPage({ params, searchParams }: ProductPageProps) 
               </div>
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Shield className="h-5 w-5" />
-                <span>Pago seguro con Mercado Pago</span>
+                <span>Pago seguro con múltiples medios de pago</span>
               </div>
             </div>
           </div>
         </div>
 
-        <ProductReviewsList reviews={reviews} />
+        <ProductReviewsCarousel reviews={reviews} />
 
         {relatedProducts.length > 0 && (
           <div className="mt-16">

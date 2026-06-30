@@ -30,6 +30,9 @@ export type StorefrontProductReview = {
   comment: string
   source: 'mercadolibre' | 'amazon' | 'aliexpress' | 'manual'
   sourceUrl: string | null
+  customerPhotoUrl: string | null
+  reviewPhotoUrl: string | null
+  createdAt: string | null
 }
 
 export const DEFAULT_STOREFRONT_FAVICON = '/icon.svg'

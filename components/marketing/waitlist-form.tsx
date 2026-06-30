@@ -100,7 +100,7 @@ export function WaitlistForm({
               Enviando...
             </>
           ) : (
-            'Unirme a la lista de espera'
+            'Quiero vender sin comisiones'
           )}
         </Button>
       </form>

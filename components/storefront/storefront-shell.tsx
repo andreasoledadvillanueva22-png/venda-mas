@@ -169,7 +169,7 @@ export function StorefrontShell({
               <h3 className="text-lg font-bold">{storeName}</h3>
               <p className="text-sm leading-relaxed text-slate-400">
                 {store?.description ??
-                  'Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago.'}
+                  'Productos de calidad con envío a toda Argentina. Compra segura con múltiples medios de pago.'}
               </p>
               {hasSocialLinks ? (
                 <div className="flex flex-wrap gap-3">

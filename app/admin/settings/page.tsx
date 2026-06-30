@@ -58,6 +58,7 @@ type DbStore = {
   alias: string | null
   account_holder: string | null
   cuit: string | null
+  cash_on_delivery_enabled: boolean | null
   custom_domain: string | null
   domain_verified: boolean | null
   domain_verification_token: string | null
@@ -111,6 +112,8 @@ type SettingsPageProps = {
     pickup_error?: string
     bank_saved?: string
     bank_error?: string
+    cash_saved?: string
+    cash_error?: string
     domain_saved?: string
     domain_verified_msg?: string
     domain_removed?: string
@@ -280,7 +283,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook',
+      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -1174,6 +1177,59 @@ export async function saveBankDetails(formData: FormData): Promise<void> {
   redirect('/admin/settings?bank_saved=1')
 }
 
+export async function saveCashOnDeliverySettings(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const cashOnDeliveryEnabled = formData.get('cashOnDeliveryEnabled') === 'true'
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?cash_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?cash_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({ cash_on_delivery_enabled: cashOnDeliveryEnabled })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?cash_error=${encodeURIComponent('No se pudo guardar la configuración de efectivo contra entrega.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  revalidatePath('/storefront/checkout')
+  redirect('/admin/settings?cash_saved=1')
+}
+
 export async function addCustomDomain(formData: FormData): Promise<void> {
   'use server'
 
@@ -1425,6 +1481,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     pickup_error,
     bank_saved,
     bank_error,
+    cash_saved,
+    cash_error,
     domain_saved,
     domain_verified_msg,
     domain_removed,
@@ -1459,6 +1517,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
   )
   const shippingExpressCost = Number(store.shipping_express_cost ?? DEFAULT_SHIPPING_EXPRESS_COST)
   const enableLocalPickup = store.enable_local_pickup ?? false
+  const cashOnDeliveryEnabled = store.cash_on_delivery_enabled ?? false
   const customDomain = store.custom_domain
   const domainVerified = store.domain_verified ?? false
   const domainVerificationToken = store.domain_verification_token
@@ -1544,6 +1603,18 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {bank_error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {bank_error}
+          </div>
+        ) : null}
+
+        {cash_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Configuración de efectivo contra entrega guardada correctamente
+          </div>
+        ) : null}
+
+        {cash_error ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {cash_error}
           </div>
         ) : null}
 
@@ -2482,6 +2553,38 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
 
               <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
                 Guardar configuración de retiro
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Efectivo contra entrega</CardTitle>
+            <CardDescription>
+              Los clientes podrán pagar en efectivo cuando reciban el producto.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form action={saveCashOnDeliverySettings} className="space-y-6">
+              <input type="hidden" name="storeId" value={store.id} />
+              <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-4">
+                <input
+                  type="checkbox"
+                  name="cashOnDeliveryEnabled"
+                  value="true"
+                  defaultChecked={cashOnDeliveryEnabled}
+                  className="mt-1 h-4 w-4 rounded border border-input text-red-600"
+                />
+                <div>
+                  <p className="font-medium text-foreground">Habilitar efectivo contra entrega</p>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Mostrá esta opción en el checkout para que tus clientes paguen al recibir el pedido.
+                  </p>
+                </div>
+              </label>
+              <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">
+                Guardar método de pago
               </Button>
             </form>
           </CardContent>

@@ -152,7 +152,7 @@ export async function generateMetadata({ searchParams }: StorefrontPageProps): P
     title: `${storeName} - Tienda Online con Envío a Toda Argentina`,
     description:
       store?.description ??
-      'Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago.',
+      'Productos de calidad con envío a toda Argentina. Compra segura con múltiples medios de pago.',
     keywords: buildKeywords(storeName, categories),
   }
 }
@@ -261,7 +261,7 @@ export default async function StorefrontPage({ searchParams }: StorefrontPagePro
                 <span className="sf-text-primary">{storeName}</span>
               </h1>
               <p className="max-w-xl text-lg text-slate-600">
-                Productos de calidad con envío a toda Argentina. Compra segura con Mercado Pago
+                Productos de calidad con envío a toda Argentina. Compra segura con múltiples medios de pago
                 o WhatsApp.
               </p>
               <div className="flex flex-wrap gap-4">

@@ -1,12 +1,14 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Loader2, Trash2 } from 'lucide-react'
+import { createPortal } from 'react-dom'
+import { FileUp, Loader2, Trash2, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
+import { parseBulkReviews } from '@/lib/parse-bulk-reviews'
 
 type ReviewSource = 'mercadolibre' | 'amazon' | 'aliexpress' | 'manual'
 
@@ -17,6 +19,8 @@ type DbProductReview = {
   comment: string
   source: ReviewSource
   source_url: string | null
+  customer_photo_url: string | null
+  review_photo_url: string | null
 }
 
 type ProductReviewsManagerProps = {
@@ -31,29 +35,50 @@ const SOURCE_OPTIONS: Array<{ value: ReviewSource; label: string }> = [
   { value: 'manual', label: 'Manual / otro' },
 ]
 
+const REVIEW_SELECT =
+  'id, customer_name, rating, comment, source, source_url, customer_photo_url, review_photo_url'
+
+const BULK_IMPORT_PLACEHOLDER = `Nombre: Juan Pérez
+Rating: 5
+Comentario: Excelente producto
+---
+Nombre: María López
+Rating: 4
+Comentario: Muy bueno, llegó rápido`
+
 const initialForm = {
   customerName: '',
   rating: '5',
   comment: '',
   source: 'manual' as ReviewSource,
   sourceUrl: '',
+  customerPhotoUrl: '',
+  reviewPhotoUrl: '',
 }
 
 export function ProductReviewsManager({ storeId, productId }: ProductReviewsManagerProps) {
   const supabase = createClient()
+  const [mounted, setMounted] = useState(false)
   const [reviews, setReviews] = useState<DbProductReview[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [form, setForm] = useState(initialForm)
+  const [showImportModal, setShowImportModal] = useState(false)
+  const [importText, setImportText] = useState('')
+  const [importing, setImporting] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     async function loadReviews() {
       setLoading(true)
       const { data, error: fetchError } = await supabase
         .from('product_reviews')
-        .select('id, customer_name, rating, comment, source, source_url')
+        .select(REVIEW_SELECT)
         .eq('store_id', storeId)
         .eq('product_id', productId)
         .order('created_at', { ascending: false })
@@ -68,6 +93,19 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
 
     void loadReviews()
   }, [supabase, storeId, productId])
+
+  useEffect(() => {
+    if (!showImportModal) {
+      return
+    }
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+    }
+  }, [showImportModal])
 
   const handleAddReview = async () => {
     setError('')
@@ -102,8 +140,10 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
           comment: form.comment.trim(),
           source: form.source,
           source_url: form.sourceUrl.trim() || null,
+          customer_photo_url: form.customerPhotoUrl.trim() || null,
+          review_photo_url: form.reviewPhotoUrl.trim() || null,
         })
-        .select('id, customer_name, rating, comment, source, source_url')
+        .select(REVIEW_SELECT)
         .single()
 
       if (insertError || !data) {
@@ -116,6 +156,56 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
       setSuccess('Reseña guardada correctamente.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleBulkImport = async () => {
+    setError('')
+    setSuccess('')
+
+    const { reviews: parsedReviews, errors } = parseBulkReviews(importText)
+
+    if (errors.length > 0) {
+      setError(errors.join(' '))
+      return
+    }
+
+    if (parsedReviews.length === 0) {
+      setError('No se encontraron reseñas válidas para importar.')
+      return
+    }
+
+    setImporting(true)
+
+    try {
+      const payload = parsedReviews.map((review) => ({
+        store_id: storeId,
+        product_id: productId,
+        customer_name: review.customerName,
+        rating: review.rating,
+        comment: review.comment,
+        source: review.source,
+        source_url: null,
+        customer_photo_url: review.customerPhotoUrl,
+        review_photo_url: review.reviewPhotoUrl,
+      }))
+
+      const { data, error: insertError } = await supabase
+        .from('product_reviews')
+        .insert(payload)
+        .select(REVIEW_SELECT)
+
+      if (insertError || !data) {
+        setError(insertError?.message ?? 'No se pudieron importar las reseñas.')
+        return
+      }
+
+      setReviews((current) => [...(data as DbProductReview[]), ...current])
+      setImportText('')
+      setShowImportModal(false)
+      setSuccess(`${data.length} reseñas importadas correctamente.`)
+    } finally {
+      setImporting(false)
     }
   }
 
@@ -140,11 +230,27 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Reseñas importadas</CardTitle>
-        <CardDescription>
-          Agregá opiniones de Mercado Libre, Amazon, AliExpress u otras fuentes para mostrarlas en
-          la página del producto.
-        </CardDescription>
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <CardTitle>Reseñas importadas</CardTitle>
+            <CardDescription>
+              Agregá opiniones de Mercado Libre, Amazon, AliExpress u otras fuentes para mostrarlas en
+              la página del producto.
+            </CardDescription>
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setError('')
+              setSuccess('')
+              setShowImportModal(true)
+            }}
+          >
+            <FileUp className="mr-2 h-4 w-4" />
+            Importar reseñas
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {error ? (
@@ -171,21 +277,30 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
                 key={review.id}
                 className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-start sm:justify-between"
               >
-                <div className="space-y-1">
-                  <p className="font-semibold text-foreground">{review.customer_name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {SOURCE_OPTIONS.find((option) => option.value === review.source)?.label ??
-                      review.source}{' '}
-                    · {review.rating} estrellas
-                  </p>
-                  <p className="text-sm text-foreground">&ldquo;{review.comment}&rdquo;</p>
+                <div className="flex gap-3">
+                  {review.customer_photo_url ? (
+                    <img
+                      src={review.customer_photo_url}
+                      alt={review.customer_name}
+                      className="h-10 w-10 rounded-full object-cover"
+                    />
+                  ) : null}
+                  <div className="space-y-1">
+                    <p className="font-semibold text-foreground">{review.customer_name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {SOURCE_OPTIONS.find((option) => option.value === review.source)?.label ??
+                        review.source}{' '}
+                      · {review.rating} estrellas
+                    </p>
+                    <p className="text-sm text-foreground">&ldquo;{review.comment}&rdquo;</p>
+                  </div>
                 </div>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => void handleDeleteReview(review.id)}
-                  disabled={saving}
+                  disabled={saving || importing}
                 >
                   <Trash2 className="mr-1 h-4 w-4" />
                   Eliminar
@@ -210,7 +325,7 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
             event.stopPropagation()
           }}
         >
-          <p className="text-sm font-medium text-foreground">Importar reseña</p>
+          <p className="text-sm font-medium text-foreground">Agregar reseña</p>
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -274,6 +389,35 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
             </div>
           </div>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor="reviewCustomerPhotoUrl">URL de foto del cliente (opcional)</Label>
+              <Input
+                id="reviewCustomerPhotoUrl"
+                type="url"
+                value={form.customerPhotoUrl}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, customerPhotoUrl: event.target.value }))
+                }
+                placeholder="https://..."
+                disabled={saving}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="reviewPhotoUrl">URL de foto de la reseña (opcional)</Label>
+              <Input
+                id="reviewPhotoUrl"
+                type="url"
+                value={form.reviewPhotoUrl}
+                onChange={(event) =>
+                  setForm((current) => ({ ...current, reviewPhotoUrl: event.target.value }))
+                }
+                placeholder="https://..."
+                disabled={saving}
+              />
+            </div>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="reviewComment">Comentario</Label>
             <textarea
@@ -290,7 +434,7 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
 
           <Button
             type="button"
-            disabled={saving}
+            disabled={saving || importing}
             className="bg-red-600 text-white hover:bg-red-700"
             onClick={(event) => {
               event.preventDefault()
@@ -302,6 +446,70 @@ export function ProductReviewsManager({ storeId, productId }: ProductReviewsMana
           </Button>
         </div>
       </CardContent>
+
+      {mounted && showImportModal
+        ? createPortal(
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4">
+              <Card className="max-h-[90vh] w-full max-w-2xl overflow-y-auto">
+                <CardHeader>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>Importar reseñas</CardTitle>
+                      <CardDescription>
+                        Pegá varias reseñas separadas por líneas con <code>---</code>. Cada bloque debe
+                        incluir Nombre, Rating y Comentario.
+                      </CardDescription>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowImportModal(false)}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted"
+                      aria-label="Cerrar"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <textarea
+                    value={importText}
+                    onChange={(event) => setImportText(event.target.value)}
+                    placeholder={BULK_IMPORT_PLACEHOLDER}
+                    rows={12}
+                    disabled={importing}
+                    className="w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-sm outline-none transition focus-visible:border-ring focus-visible:ring-ring/50"
+                  />
+                  <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => setShowImportModal(false)}
+                      disabled={importing}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="button"
+                      className="bg-red-600 text-white hover:bg-red-700"
+                      disabled={importing}
+                      onClick={() => void handleBulkImport()}
+                    >
+                      {importing ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Importando...
+                        </>
+                      ) : (
+                        'Importar reseñas'
+                      )}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>,
+            document.body,
+          )
+        : null}
     </Card>
   )
 }

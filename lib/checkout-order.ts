@@ -206,6 +206,11 @@ export async function createGuestOrder(
 
   const isGuest = !input.profileId
 
+  const orderStatus =
+    input.paymentMethod === 'effectivo' || input.paymentMethod === 'bank_transfer'
+      ? 'pending_payment'
+      : 'pending'
+
   const { data: order, error: orderError } = await admin
     .from('orders')
     .insert({
@@ -214,7 +219,7 @@ export async function createGuestOrder(
       customer_email: normalizedEmail,
       customer_phone: input.customer.phone.trim(),
       customer_address: input.customer.address,
-      status: 'pending',
+      status: orderStatus,
       payment_status: 'pending',
       payment_method: input.paymentMethod,
       shipping_method: orderShippingMethod,

@@ -367,17 +367,19 @@ function resolveFreeShippingFromProducts(
 type CheckoutStore = {
   id: string
   name: string
+  cashOnDeliveryEnabled: boolean
   shippingConfig: ShippingConfig
   localPickupConfig: LocalPickupConfig
   bankDetails: BankDetailsConfig
 }
 
 const STORE_SELECT_FIELDS =
-  'id, name, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit'
+  'id, name, cash_on_delivery_enabled, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit'
 
 function mapCheckoutStore(store: {
   id: string
   name: string
+  cash_on_delivery_enabled: boolean | null
   free_shipping_threshold: number | null
   shipping_standard_cost: number | null
   shipping_express_cost: number | null
@@ -395,6 +397,7 @@ function mapCheckoutStore(store: {
   return {
     id: store.id,
     name: store.name,
+    cashOnDeliveryEnabled: store.cash_on_delivery_enabled ?? false,
     shippingConfig: {
       freeShippingThreshold: Number(
         store.free_shipping_threshold ?? DEFAULT_SHIPPING_CONFIG.freeShippingThreshold,
@@ -509,6 +512,7 @@ export default function CheckoutPage() {
     DEFAULT_LOCAL_PICKUP_CONFIG,
   )
   const [bankDetails, setBankDetails] = useState<BankDetailsConfig>(DEFAULT_BANK_DETAILS)
+  const [cashOnDeliveryEnabled, setCashOnDeliveryEnabled] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [paymentError, setPaymentError] = useState('')
@@ -550,6 +554,7 @@ export default function CheckoutPage() {
         setShippingConfig(store.shippingConfig)
         setLocalPickupConfig(store.localPickupConfig)
         setBankDetails(store.bankDetails)
+        setCashOnDeliveryEnabled(store.cashOnDeliveryEnabled)
       }
 
       if (customerPrefill.email || customerPrefill.nombre) {
@@ -633,12 +638,24 @@ export default function CheckoutPage() {
     }
   }, [bankDetails, paymentMethod])
 
+  useEffect(() => {
+    if (!cashOnDeliveryEnabled && paymentMethod === 'effectivo') {
+      setPaymentMethod('mercadopago')
+    }
+  }, [cashOnDeliveryEnabled, paymentMethod])
+
   const availablePaymentMethods = useMemo(
     () =>
-      paymentMethods.filter(
-        (method) => method.id !== 'bank_transfer' || isBankTransferConfigured(bankDetails),
-      ),
-    [bankDetails],
+      paymentMethods.filter((method) => {
+        if (method.id === 'bank_transfer') {
+          return isBankTransferConfigured(bankDetails)
+        }
+        if (method.id === 'effectivo') {
+          return cashOnDeliveryEnabled
+        }
+        return true
+      }),
+    [bankDetails, cashOnDeliveryEnabled],
   )
 
   const isLocalPickup = shippingMethod === 'local_pickup'
@@ -1248,6 +1265,11 @@ export default function CheckoutPage() {
                 {paymentMethod === 'bank_transfer' && isBankTransferConfigured(bankDetails) ? (
                   <BankTransferDetails bankDetails={bankDetails} />
                 ) : null}
+                {paymentMethod === 'effectivo' && cashOnDeliveryEnabled ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800">
+                    Pagás en efectivo cuando recibas el producto.
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
 
@@ -1353,7 +1375,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex items-center gap-2 rounded-xl border border-brand-100 bg-brand-50/50 px-3 py-2 text-xs text-brand-700">
                   <Shield className="h-4 w-4 text-emerald-600" />
-                  Pago seguro con Mercado Pago
+                  Pago seguro con múltiples medios de pago
                 </div>
               </CardContent>
             </Card>

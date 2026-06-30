@@ -215,7 +215,9 @@ export async function getProductReviews(
 
   const { data: rows, error } = await supabase
     .from('product_reviews')
-    .select('id, customer_name, rating, comment, source, source_url')
+    .select(
+      'id, customer_name, rating, comment, source, source_url, customer_photo_url, review_photo_url, created_at',
+    )
     .eq('product_id', productId)
     .eq('store_id', storeId)
     .order('created_at', { ascending: false })
@@ -231,6 +233,9 @@ export async function getProductReviews(
     comment: row.comment,
     source: row.source as StorefrontProductReview['source'],
     sourceUrl: row.source_url?.trim() || null,
+    customerPhotoUrl: row.customer_photo_url?.trim() || null,
+    reviewPhotoUrl: row.review_photo_url?.trim() || null,
+    createdAt: row.created_at ?? null,
   }))
 }
 

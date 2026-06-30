@@ -14,6 +14,7 @@ export function AuthFormHeader({ title, description }: AuthFormHeaderProps) {
         </div>
       </div>
       <div className="space-y-2">
+        <p className="text-sm font-medium text-white/90">Vendé sin comisiones por venta</p>
         <h1 className="text-2xl font-bold text-white">{title}</h1>
         <p className="text-base text-white/80">{description}</p>
       </div>
