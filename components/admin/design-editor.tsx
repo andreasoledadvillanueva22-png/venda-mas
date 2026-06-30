@@ -15,7 +15,7 @@ import {
 } from 'lucide-react'
 import { saveStoreDesignSettings } from '@/app/admin/design/actions'
 import { GoogleFontLoader } from '@/components/admin/google-font-loader'
-import { Badge } from '@/components/ui/badge'
+import { ViewStoreLink } from '@/components/admin/view-store-link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -38,13 +38,13 @@ const fontOptions = [...FONT_OPTIONS]
 
 type DesignEditorProps = {
   initial: StoreDesignSettings
+  storeSlug: string
 }
 
-export function DesignEditor({ initial }: DesignEditorProps) {
+export function DesignEditor({ initial, storeSlug }: DesignEditorProps) {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState('tema')
   const [selectedTheme, setSelectedTheme] = useState(initial.themeId)
-  const [showPreview, setShowPreview] = useState(false)
   const [showHeroModal, setShowHeroModal] = useState(false)
   const [saveMessage, setSaveMessage] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -122,9 +122,13 @@ export function DesignEditor({ initial }: DesignEditorProps) {
             <p className="text-sm text-brand-600">Personaliza el aspecto de tu tienda y su tipografía.</p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button onClick={() => setShowPreview(true)} variant="outline">
-              <Eye className="mr-2 h-4 w-4" /> Vista previa
-            </Button>
+            <ViewStoreLink
+              storeSlug={storeSlug}
+              size="default"
+              label="Vista previa"
+              hideLabelOnMobile={false}
+              className="h-9 px-3"
+            />
             <Button onClick={handleSave} disabled={isSaving} className="bg-red-600 text-white hover:bg-red-700">
               {isSaving ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -517,52 +521,6 @@ export function DesignEditor({ initial }: DesignEditorProps) {
           </div>
         </Tabs>
       </div>
-
-      {showPreview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <Card className="w-full max-w-3xl">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>Vista previa</CardTitle>
-                </div>
-                <button onClick={() => setShowPreview(false)} className="inline-flex h-8 w-8 items-center justify-center rounded-lg hover:bg-muted">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </CardHeader>
-            <Separator />
-            <CardContent className="space-y-4 py-6">
-              <div
-                className="rounded-3xl border border-border p-6"
-                style={{
-                  backgroundColor: colors.background,
-                  color: colors.text,
-                  fontFamily: bodyFontFamily,
-                  fontSize: `${baseFontSize}px`,
-                }}
-              >
-                <div className="mb-6 flex items-center justify-between">
-                  <div>
-                    <p className="text-sm uppercase tracking-[0.25em] text-muted-foreground">Tema seleccionado</p>
-                    <h2 className="text-3xl font-semibold" style={{ fontFamily: titleFontFamily }}>
-                      {currentTheme?.name}
-                    </h2>
-                  </div>
-                  <Badge className="rounded-full bg-red-100 text-red-700">{colors.primary}</Badge>
-                </div>
-                <div className="rounded-3xl border border-border p-6" style={{ backgroundColor: colors.primary, color: '#ffffff' }}>
-                  <h3 className="text-2xl font-semibold">{heroConfig.title}</h3>
-                  <p className="mt-3 text-sm leading-6">{heroConfig.subtitle}</p>
-                  <Button className="mt-6 bg-white text-foreground hover:bg-slate-100" style={{ color: colors.primary }}>
-                    {heroConfig.ctaText}
-                  </Button>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {showHeroModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">

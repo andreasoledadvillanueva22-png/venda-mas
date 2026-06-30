@@ -1,4 +1,4 @@
-import { AdminHeader } from '@/components/admin/header'
+import { redirect } from 'next/navigation'
 import { KPICard } from '@/components/admin/kpi-card'
 import { RevenueChart } from '@/components/admin/revenue-chart'
 import { RecentOrders } from '@/components/admin/recent-orders'
@@ -6,8 +6,6 @@ import { QuickActions } from '@/components/admin/quick-actions'
 import { TopProducts } from '@/components/admin/top-products'
 import { getDashboardStats } from '@/lib/admin-dashboard'
 import { getOwnerStore } from '@/lib/admin-store'
-import { PLATFORM_DOMAIN } from '@/lib/custom-domain'
-import { redirect } from 'next/navigation'
 import { DollarSign, ShoppingCart, Users, TrendingUp } from 'lucide-react'
 
 function formatPrice(value: number) {
@@ -26,17 +24,9 @@ export default async function AdminDashboard() {
   }
 
   const stats = await getDashboardStats(store.id)
-  const storeDomain = `${store.slug}.${PLATFORM_DOMAIN}`
 
   return (
     <div className="flex flex-col min-h-screen">
-      <AdminHeader
-        storeName={store.name}
-        storeDomain={storeDomain}
-        storeSlug={store.slug}
-        initials={store.initials}
-      />
-
       <div className="flex-1 space-y-6 p-6">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KPICard

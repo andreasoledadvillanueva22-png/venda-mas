@@ -3,7 +3,10 @@
 import { useState } from 'react'
 import { Menu } from 'lucide-react'
 import { AdminSidebar } from '@/components/admin/sidebar'
+import { AdminHeader } from '@/components/admin/header'
+import { ViewStoreLink } from '@/components/admin/view-store-link'
 import { Logo } from '@/components/ui/logo'
+import { PLATFORM_DOMAIN } from '@/lib/custom-domain'
 import type { AdminLayoutData } from '@/lib/admin-store'
 
 type AdminShellProps = AdminLayoutData & {
@@ -13,12 +16,14 @@ type AdminShellProps = AdminLayoutData & {
 export function AdminShell({
   children,
   storeName,
+  storeSlug,
   brandInitials,
   userEmail,
   userFullName,
   ordersCount,
 }: AdminShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const storeDomain = `${storeSlug}.${PLATFORM_DOMAIN}`
 
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-br from-brand-50 to-brand-100">
@@ -36,6 +41,7 @@ export function AdminShell({
       >
         <AdminSidebar
           storeName={storeName}
+          storeSlug={storeSlug}
           brandInitials={brandInitials}
           userEmail={userEmail}
           userFullName={userFullName}
@@ -55,7 +61,17 @@ export function AdminShell({
             <span className="sr-only">Abrir menú</span>
           </button>
           <Logo size="sm" />
-          <span className="truncate font-semibold text-brand-900">{storeName}</span>
+          <span className="min-w-0 flex-1 truncate font-semibold text-brand-900">{storeName}</span>
+          <ViewStoreLink storeSlug={storeSlug} showLabel={false} size="icon" />
+        </div>
+
+        <div className="hidden lg:block">
+          <AdminHeader
+            storeName={storeName}
+            storeDomain={storeDomain}
+            storeSlug={storeSlug}
+            initials={brandInitials}
+          />
         </div>
 
         <main className="flex-1 overflow-y-auto">{children}</main>

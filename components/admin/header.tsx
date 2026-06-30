@@ -1,9 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { Bell, HelpCircle, ExternalLink } from 'lucide-react'
+import { Bell, HelpCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Logo } from '@/components/ui/logo'
+import { ViewStoreLink } from '@/components/admin/view-store-link'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -35,17 +36,10 @@ export function AdminHeader({ storeName, storeDomain, storeSlug, initials }: Adm
           <p className="font-bold text-brand-900">{storeName}</p>
           <p className="text-xs text-brand-600">{storeDomain}</p>
         </div>
-        <Link
-          href={`/storefront?store=${encodeURIComponent(storeSlug)}`}
-          target="_blank"
-          className="ml-2 hidden h-9 items-center rounded-xl border border-brand-200 bg-white px-3 text-sm font-medium text-brand-700 hover:bg-brand-50 sm:inline-flex"
-        >
-          <ExternalLink className="mr-2 h-3.5 w-3.5" />
-          Ver tienda
-        </Link>
       </div>
 
       <div className="flex items-center gap-2">
+        <ViewStoreLink storeSlug={storeSlug} />
         <Button variant="ghost" size="icon" className="text-brand-600 hover:bg-brand-50 hover:text-brand-700">
           <HelpCircle className="h-5 w-5" />
           <span className="sr-only">Ayuda</span>

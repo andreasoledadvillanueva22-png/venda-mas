@@ -53,7 +53,7 @@ export default function LandingPage() {
             href="/auth/login"
             className="rounded-lg border border-white/40 bg-transparent px-4 py-2 text-sm font-medium text-white transition hover:bg-white/10"
           >
-            Ingresar
+            Ya soy usuario
           </Link>
         </div>
       </header>
@@ -124,7 +124,7 @@ export default function LandingPage() {
           <p>© {new Date().getFullYear()} VendaMás. Todos los derechos reservados.</p>
           <div className="flex items-center gap-5">
             <Link href="/auth/login" className="transition hover:text-white">
-              Ingresar
+              Ya soy usuario
             </Link>
             <span className="text-white/30">|</span>
             <Link href="#" className="transition hover:text-white">

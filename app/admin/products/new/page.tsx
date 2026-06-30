@@ -550,7 +550,7 @@ function NewProductPageContent() {
         </div>
       </div>
 
-      <form id="new-product-form" onSubmit={handleSubmit} className="space-y-6 p-6">
+      <div className="space-y-6 p-6">
         {isLoading && (
           <div className="rounded-xl border border-border bg-white p-4 text-sm text-muted-foreground">
             {loadingStore
@@ -578,7 +578,8 @@ function NewProductPageContent() {
         )}
 
         <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="space-y-6">
+          <form id="new-product-form" onSubmit={handleSubmit} className="contents">
+            <div className="space-y-6 lg:col-start-1 lg:row-start-1 lg:row-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>Información del producto</CardTitle>
@@ -800,9 +801,9 @@ function NewProductPageContent() {
                 </div>
               </CardContent>
             </Card>
-          </div>
+            </div>
 
-          <div className="space-y-6">
+            <div className="space-y-6 lg:col-start-2 lg:row-start-2">
             <Card>
               <CardHeader>
                 <CardTitle>Organización</CardTitle>
@@ -857,17 +858,16 @@ function NewProductPageContent() {
                 </div>
               </CardContent>
             </Card>
+            </div>
+          </form>
 
-          </div>
+          {isEditMode && storeId && editProductId ? (
+            <div className="lg:col-start-2 lg:row-start-1">
+              <ProductReviewsManager storeId={storeId} productId={editProductId} />
+            </div>
+          ) : null}
         </div>
-      </form>
-
-      {isEditMode && storeId && editProductId ? (
-        <div className="grid gap-6 px-6 pb-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="hidden lg:block" aria-hidden="true" />
-          <ProductReviewsManager storeId={storeId} productId={editProductId} />
-        </div>
-      ) : null}
+      </div>
     </div>
   )
 }

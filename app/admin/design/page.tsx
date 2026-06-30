@@ -47,5 +47,5 @@ export default async function AdminDesignPage() {
     baseFontSize: row?.base_font_size ?? 16,
   }
 
-  return <DesignEditor initial={initial} />
+  return <DesignEditor initial={initial} storeSlug={store.slug} />
 }

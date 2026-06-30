@@ -15,6 +15,7 @@ import {
   ChevronDown,
   LogOut,
   X,
+  Eye,
 } from 'lucide-react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Logo } from '@/components/ui/logo'
@@ -39,6 +40,7 @@ const navigation = [
 
 interface AdminSidebarProps {
   storeName: string
+  storeSlug: string
   brandInitials: string
   userEmail?: string
   userFullName?: string | null
@@ -49,6 +51,7 @@ interface AdminSidebarProps {
 
 export function AdminSidebar({
   storeName,
+  storeSlug,
   brandInitials,
   userEmail = 'admin@VendaMás.com',
   userFullName,
@@ -114,6 +117,15 @@ export function AdminSidebar({
       </nav>
 
       <div className="border-t border-brand-200 p-3">
+        <a
+          href={`/storefront?store=${encodeURIComponent(storeSlug)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mb-2 flex items-center gap-3 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2.5 text-sm font-medium text-brand-700 transition-colors hover:bg-brand-100"
+        >
+          <Eye className="h-5 w-5 shrink-0" />
+          <span>Ver mi tienda</span>
+        </a>
         <DropdownMenu>
           <DropdownMenuTrigger className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-sm outline-none transition-colors hover:bg-brand-50">
             <Avatar className="h-9 w-9">
