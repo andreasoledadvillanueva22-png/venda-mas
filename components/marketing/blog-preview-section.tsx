@@ -1,6 +1,6 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { getFeaturedBlogPosts } from '@/lib/blog-posts'
+import { formatBlogDate, getFeaturedBlogPosts } from '@/lib/blog-posts'
 
 export function BlogPreviewSection() {
   const posts = getFeaturedBlogPosts(3)
@@ -26,17 +26,27 @@ export function BlogPreviewSection() {
               <div className="relative aspect-[16/10] overflow-hidden">
                 <Image
                   src={post.imageUrl}
-                  alt={post.title}
+                  alt={post.imageAlt}
                   fill
+                  loading="lazy"
                   className="object-cover transition duration-300 group-hover:scale-105"
                   sizes="(max-width: 768px) 100vw, 33vw"
                 />
               </div>
               <div className="p-6">
-                <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
-                  {post.category}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-brand-600">
+                    {post.category}
+                  </p>
+                  <span className="text-xs text-brand-500">{post.readTime}</span>
+                </div>
+                <time className="mt-1 block text-xs text-brand-500" dateTime={post.publishedAt}>
+                  {formatBlogDate(post.publishedAt)}
+                </time>
                 <h3 className="mt-2 text-lg font-bold leading-snug text-brand-900">{post.title}</h3>
+                <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-brand-700/80">
+                  {post.excerpt}
+                </p>
                 <Link
                   href={`/blog/${post.slug}`}
                   className="mt-4 inline-flex text-sm font-semibold text-brand-600 transition hover:text-brand-700"

@@ -1,13 +1,20 @@
 import type { Metadata } from 'next'
 import Image from 'next/image'
 import Link from 'next/link'
+import { BlogNewsletterBanner } from '@/components/blog/blog-newsletter-banner'
 import { MarketingHeader } from '@/components/marketing/marketing-header'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { formatBlogDate, getAllBlogPosts } from '@/lib/blog-posts'
 
 export const metadata: Metadata = {
-  title: 'Blog — VendaMás',
-  description: 'Recursos gratuitos para hacer crecer tu negocio online.',
+  title: 'Blog | VendaMás — Tips para vender online sin comisiones',
+  description:
+    'Guías, tutoriales y consejos para microemprendedores argentinos. Aprendé a vender más con tu tienda online.',
+  openGraph: {
+    title: 'Blog de VendaMás',
+    description: 'Recursos gratuitos para hacer crecer tu negocio online.',
+    type: 'website',
+  },
 }
 
 export default function BlogPage() {
@@ -26,7 +33,11 @@ export default function BlogPage() {
             </p>
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-12">
+            <BlogNewsletterBanner />
+          </div>
+
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {posts.map((post) => (
               <article
                 key={post.slug}
@@ -35,23 +46,25 @@ export default function BlogPage() {
                 <div className="relative aspect-[16/10] overflow-hidden">
                   <Image
                     src={post.imageUrl}
-                    alt={post.title}
+                    alt={post.imageAlt}
                     fill
+                    loading="lazy"
                     className="object-cover transition duration-300 group-hover:scale-105"
                     sizes="(max-width: 768px) 100vw, 33vw"
                   />
                 </div>
                 <div className="p-6">
-                  <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="rounded-full bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
                       {post.category}
                     </span>
-                    <time className="text-xs text-brand-500" dateTime={post.publishedAt}>
-                      {formatBlogDate(post.publishedAt)}
-                    </time>
+                    <span className="text-xs text-brand-500">{post.readTime}</span>
                   </div>
+                  <time className="mt-2 block text-xs text-brand-500" dateTime={post.publishedAt}>
+                    {formatBlogDate(post.publishedAt)}
+                  </time>
                   <h2 className="mt-3 text-lg font-bold leading-snug text-brand-900">{post.title}</h2>
-                  <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-brand-700/80">
+                  <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-brand-700/80">
                     {post.excerpt}
                   </p>
                   <Link

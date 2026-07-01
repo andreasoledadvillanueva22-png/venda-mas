@@ -8,8 +8,24 @@ import { PostHogProvider } from '@/components/providers/posthog-provider'
 const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: 'VendaMás',
-  description: 'Plataforma de tiendas online con envío a toda Argentina',
+  title: {
+    default: 'VendaMás — Vendé online sin comisiones',
+    template: '%s | VendaMás',
+  },
+  description:
+    'La plataforma de e-commerce para microemprendedores argentinos. Creá tu tienda online sin comisiones por venta desde $9.900/mes.',
+  keywords: [
+    'tienda online',
+    'ecommerce argentina',
+    'vender online',
+    'microemprendedores',
+    'sin comisiones',
+  ],
+  openGraph: {
+    type: 'website',
+    locale: 'es_AR',
+    siteName: 'VendaMás',
+  },
 }
 
 export default function RootLayout({
