@@ -53,12 +53,22 @@ const nextConfig = {
   },
 }
 
+const hasSentryDsn = Boolean(process.env.NEXT_PUBLIC_SENTRY_DSN)
+
+const shouldUploadSourceMaps =
+  hasSentryDsn &&
+  Boolean(process.env.SENTRY_AUTH_TOKEN) &&
+  Boolean(process.env.SENTRY_ORG) &&
+  Boolean(process.env.SENTRY_PROJECT) &&
+  process.env.SENTRY_UPLOAD_SOURCE_MAPS === 'true'
+
 const sentryBuildOptions = {
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-  silent: !process.env.CI,
+  silent: true,
+  sourcemaps: {
+    disable: !shouldUploadSourceMaps,
+  },
 }
 
-export default process.env.NEXT_PUBLIC_SENTRY_DSN
-  ? withSentryConfig(nextConfig, sentryBuildOptions)
-  : nextConfig
+export default hasSentryDsn ? withSentryConfig(nextConfig, sentryBuildOptions) : nextConfig

@@ -30,7 +30,7 @@ function PostHogPageViewTracker() {
 export function PostHogProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const key = process.env.NEXT_PUBLIC_POSTHOG_KEY
-    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://app.posthog.com'
+    const host = process.env.NEXT_PUBLIC_POSTHOG_HOST ?? 'https://us.posthog.com'
 
     if (!key) {
       return

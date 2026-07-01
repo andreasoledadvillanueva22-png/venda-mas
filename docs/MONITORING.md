@@ -9,10 +9,13 @@ Guía de configuración de herramientas de observabilidad para el MVP en producc
 
 ```env
 NEXT_PUBLIC_SENTRY_DSN=https://...@....ingest.sentry.io/...
-SENTRY_AUTH_TOKEN=...        # Para subir source maps en CI/Vercel
+SENTRY_AUTH_TOKEN=...        # Solo si subís source maps
 SENTRY_ORG=tu-org
-SENTRY_PROJECT=venda-mas
+SENTRY_PROJECT=nombre-exacto-en-sentry
+SENTRY_UPLOAD_SOURCE_MAPS=true  # Opcional: omitir si el proyecto aún no existe
 ```
+
+El build **no falla** si `SENTRY_UPLOAD_SOURCE_MAPS` no está en `true`: Sentry sigue capturando errores en runtime vía DSN, pero no intenta subir source maps durante el deploy.
 
 3. Archivos de configuración:
    - `sentry.client.config.ts` / `sentry.server.config.ts` / `sentry.edge.config.ts`
@@ -28,7 +31,7 @@ Sentry solo se activa en **producción** si el DSN está definido.
 
 ```env
 NEXT_PUBLIC_POSTHOG_KEY=phc_...
-NEXT_PUBLIC_POSTHOG_HOST=https://app.posthog.com
+NEXT_PUBLIC_POSTHOG_HOST=https://us.posthog.com
 ```
 
 3. Provider en `components/providers/posthog-provider.tsx`
