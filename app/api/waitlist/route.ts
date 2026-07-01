@@ -1,3 +1,4 @@
+import { sendWaitlistConfirmationEmail } from '@/lib/email'
 import { createClient } from '@/lib/supabase/server'
 import {
   isDuplicateWaitlistError,
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest) {
       { error: 'No se pudo registrar el email. Intentá de nuevo.' },
       { status: 500 },
     )
+  }
+
+  try {
+    await sendWaitlistConfirmationEmail(email)
+  } catch (error) {
+    console.error('[Waitlist] Error al enviar email de confirmación:', error)
   }
 
   return NextResponse.json({ success: true })

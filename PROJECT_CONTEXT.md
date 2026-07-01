@@ -1,10 +1,10 @@
 # VendaMás SaaS - Contexto del Proyecto
 
-**Última actualización:** 01/07/2026 - Noche
-**Estado:** Producción Activa - MVP completo con rediseño inspirado en Tienda Nube
+**Última actualización:** 02/07/2026
+**Estado:** Producción Activa - MVP completo, listo para lanzar waitlist
 
 ## 1. Resumen Ejecutivo
-VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comisiones por venta. Permite a los usuarios gestionar productos, órdenes, envíos y cobros con múltiples medios de pago. Cuenta con landing page de alta conversión (inspirada en Tienda Nube), página de pricing con comparativa, blog de recursos, admin personalizado y storefront dinámico con estética premium unificada.
+VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comisiones por venta. Permite a los usuarios gestionar productos, órdenes, envíos y cobros con múltiples medios de pago. Cuenta con landing page de alta conversión, blog SEO con 6 artículos, pricing con comparativa vs competencia, admin personalizado, storefront dinámico y sistema completo de monitoreo.
 
 ## 2. Estado Actual
 - **URL Producción:** https://venda-mas.vercel.app
@@ -13,6 +13,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - **Tiendas Activas:** 2 (Andrea: `andrea-tienda`, Hector: `hector`)
 - **Estética:** 100% unificada (Azul degradado, Glassmorphism, Logo oficial)
 - **Slogan:** "Vendé online sin comisiones. Para siempre."
+- **Monitoreo:** PostHog ✅, Sentry ✅, UptimeRobot ✅
 
 ## 3. Funcionalidades Implementadas (Status: ✅)
 
@@ -26,6 +27,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Webhooks de pago (actualización de estados)
 - [x] Dominios personalizados (estructura lista, pendiente DNS)
 - [x] Sistema de planes y suscripciones (Free, Emprendedor, Negocio, Empresa)
+- [x] Endpoint `/api/health` para monitoreo
 
 ### Storefront (Tienda)
 - [x] Diseño Premium: Header glassmorphism, cards redondeadas, footer elegante
@@ -37,7 +39,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Favicon y Logo dinámicos por tienda
 - [x] Botón "Compartir" en redes con Open Graph tags
 - [x] Carrusel automático de reseñas (5 seg, fotos, origen)
-- [x] Footer con "Powered by VendaMás" e íconos de redes sociales (Instagram, Facebook, TikTok, X)
+- [x] Footer con "Powered by VendaMás" e íconos de redes sociales
 - [x] Newsletter integrado en footer
 
 ### Admin Panel
@@ -64,13 +66,22 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Checkmarks grandes y visibles en pricing
 - [x] Badge "50% más barato que Tienda Nube" en plan Emprendedor
 - [x] Tabla comparativa con competencia (Tienda Nube, Empretienda)
-- [x] Página de Blog con 6 artículos de ejemplo
-- [x] Páginas individuales de artículos
+- [x] Página de Blog con 6 artículos SEO-friendly (800-1200 palabras c/u)
+- [x] Meta tags dinámicos + Schema.org JSON-LD en artículos
+- [x] CTAs internos hacia waitlist en cada artículo
+- [x] Newsletter signup en página principal del blog
+- [x] Imágenes relevantes de Unsplash con alt descriptivo
 - [x] Slogan: "Vendé online sin comisiones. Para siempre."
 - [x] CTA: "Crear tienda gratis"
 - [x] Diseño unificado (Azul degradado, tipografía bold)
 - [x] Logo oficial integrado en toda la app
 - [x] Auth Pages (Login/Register) con estilo glassmorphism
+
+### Monitoreo & Seguridad
+- [x] PostHog: Analytics de producto, funnels, grabación de sesiones
+- [x] Sentry: Errores en tiempo real, performance
+- [x] UptimeRobot: 2 monitores (main + health check) cada 5 min
+- [x] Snyk: Scripts de seguridad de dependencias
 
 ### Componentes UI
 - [x] Button (variantes: default, outline, secondary, ghost)
@@ -81,23 +92,24 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 
 ## 4. Pendientes (Priorizados)
 
-### PRIORIDAD ALTA
-- [ ] **Contenido real del blog:** Reescribir los 6 artículos con contenido útil y SEO-friendly
-- [ ] **Prueba Sandbox MP** con credenciales TEST- en Hector
+### PRIORIDAD ALTA (Críticos para lanzar)
+- [ ] **Prueba Sandbox MP** con credenciales TEST- en Hector (validar checkout E2E)
 - [ ] **Email transaccional** con Resend (confirmación de compra)
-- [ ] **Sistema de cobro de suscripciones** (integrar con MP para cobrar los planes)
+- [ ] **Sitemap.xml + robots.txt** (SEO básico para indexación)
+- [ ] **Sistema de cobro de suscripciones** (integrar MP para cobrar los planes)
 
 ### PRIORIDAD MEDIA
 - [ ] **Dominio:** Comprar `vendemas.app` y configurar DNS wildcard
 - [ ] **Soporte CSV** para importar reseñas masivamente
-- [ ] **SEO:** Sitemap.xml, robots.txt, schema.org
-- [ ] **Imágenes reales:** Reemplazar placeholders de Unsplash con fotos reales de emprendedores
+- [ ] **Imágenes reales:** Reemplazar placeholders de Unsplash con fotos reales
+- [ ] **Redirects** para slugs viejos del blog (si se compartieron links)
 
 ### PRIORIDAD BAJA
 - [ ] Integración logística (Andreani/Correo)
 - [ ] App móvil para vendedores
 - [ ] Analytics avanzado (gráficos de conversión, LTV)
 - [ ] Múltiples billeteras (Modo, Ualá, etc.)
+- [ ] Investigación de competencia (Tienda Nube, Pistacho, Empretienda)
 
 ## 5. Arquitectura Técnica
 - **Frontend:** Next.js 14 (App Router), React, Tailwind CSS (v4)
@@ -108,14 +120,15 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - **Logo:** https://i.ibb.co/rr2Wc9x/vendamas-logo.png
 
 ## 6. Historial Reciente
-- **01/07/2026 - Noche:** Rediseño completo inspirado en Tienda Nube (Landing, Pricing, Blog)
-- **01/07/2026 - Tarde:** Página de Pricing con 4 planes, toggle mensual/anual, tabla comparativa
-- **01/07/2026 - Tarde:** Íconos de redes sociales en footer (Instagram, Facebook, TikTok, X)
-- **01/07/2026 - Mañana:** Carrusel de reseñas + importación masiva + slogan sin comisiones + efectivo contra entrega
-- **01/07/2026 - Mañana:** Fix estética storefront, Design page, Marketing page, botones de productos
-- **30/06/2026:** Unificación estética premium (Admin, Auth, Storefront, Landing)
-- **30/06/2026:** Logo oficial integrado en toda la app
-- **29/06/2026:** Editor TipTap, compartir en redes, video de producto, reseñas importadas
+- **02/07/2026:** Blog SEO completo (6 artículos, meta tags, JSON-LD, CTAs, imágenes corregidas)
+- **02/07/2026:** Monitoreo completo (PostHog, Sentry, UptimeRobot)
+- **01/07/2026 - Noche:** Rediseño inspirado en Tienda Nube (Landing, Pricing, Blog)
+- **01/07/2026 - Tarde:** Página de Pricing con 4 planes + tabla comparativa
+- **01/07/2026 - Tarde:** Íconos de redes sociales en footer
+- **01/07/2026 - Mañana:** Carrusel de reseñas + importación masiva + efectivo contra entrega
+- **01/07/2026 - Mañana:** Fix estética storefront, Design page, Marketing page
+- **30/06/2026:** Unificación estética premium + Logo oficial
+- **29/06/2026:** Editor TipTap, compartir en redes, video, reseñas importadas
 - **29/06/2026:** Landing Page con Waitlist funcional
 
 ## 7. Costos Operativos (estimados)
@@ -125,7 +138,10 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 | Supabase | $0 | $25 USD/mes |
 | Dominio .app | $14/año | $14/año |
 | Resend | $0 (3000 emails) | $20 USD/mes |
-| **TOTAL** | **~$1.750 ARS/mes** | **~$100.000 ARS/mes** |
+| PostHog | $0 (1M eventos) | $20 USD/mes |
+| Sentry | $0 (5K errores) | $26 USD/mes |
+| UptimeRobot | $0 (50 monitores) | $7 USD/mes |
+| **TOTAL** | **~$0 ARS/mes** | **~$130.000 ARS/mes** |
 
 ## 8. Pricing Implementado
 | Plan | Precio ARS/mes | Precio ARS/año | Productos | Órdenes/mes |
@@ -142,3 +158,4 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 4. **Diseño:** Mantener coherencia con estética "Premium/Glass" (azul degradado)
 5. **Performance:** Usar `next/image` para optimización de imágenes
 6. **Slogan:** Nunca mencionar "Mercado Pago" en textos de marketing (solo en configuración técnica)
+7. **Contenido:** Español rioplatense, tono cercano y práctico

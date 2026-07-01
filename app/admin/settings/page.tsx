@@ -48,6 +48,7 @@ type DbStore = {
   mp_access_token: string | null
   mp_public_key: string | null
   mp_user_id: string | null
+  is_test_mode: boolean | null
   free_shipping_threshold: number | null
   shipping_standard_cost: number | null
   shipping_express_cost: number | null
@@ -136,6 +137,8 @@ type SettingsPageProps = {
     fake_notification_saved?: string
     fake_notification_error?: string
     fake_notification_deleted?: string
+    test_mode_saved?: string
+    subscription?: string
   }>
 }
 
@@ -325,7 +328,7 @@ async function getSettingsData(): Promise<SettingsData | null> {
   const { data: store, error: storeError } = await supabase
     .from('stores')
     .select(
-      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook, footer_tiktok, footer_twitter, plan_id',
+      'id, owner_id, name, slug, logo_url, favicon_url, hero_image_url, description, primary_color, secondary_color, mp_access_token, mp_public_key, mp_user_id, is_test_mode, free_shipping_threshold, shipping_standard_cost, shipping_express_cost, free_shipping_enabled, enable_local_pickup, pickup_address, pickup_instructions, pickup_schedule, bank_name, cbu, alias, account_holder, cuit, cash_on_delivery_enabled, custom_domain, domain_verified, domain_verification_token, footer_email, footer_phone, footer_address, footer_whatsapp, footer_instagram, footer_facebook, footer_tiktok, footer_twitter, plan_id',
     )
     .eq('owner_id', user.id)
     .maybeSingle()
@@ -952,6 +955,58 @@ export async function saveMercadoPagoCredentials(formData: FormData): Promise<vo
   redirect('/admin/settings?mp_saved=1')
 }
 
+export async function saveTestMode(formData: FormData): Promise<void> {
+  'use server'
+
+  const storeId = formData.get('storeId')
+  const isTestMode = formData.get('isTestMode') === 'true'
+
+  if (typeof storeId !== 'string' || !storeId.trim()) {
+    redirect(
+      `/admin/settings?mp_credentials_error=${encodeURIComponent('No se pudo identificar la tienda.')}`,
+    )
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    redirect('/auth/login?redirect=/admin/settings')
+  }
+
+  const { data: store, error: storeError } = await supabase
+    .from('stores')
+    .select('id, owner_id')
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+    .maybeSingle()
+
+  if (storeError || !store || store.owner_id !== user.id) {
+    redirect(
+      `/admin/settings?mp_credentials_error=${encodeURIComponent('No tenés permiso para editar esta tienda.')}`,
+    )
+  }
+
+  const { error: updateError } = await supabase
+    .from('stores')
+    .update({ is_test_mode: isTestMode })
+    .eq('id', storeId)
+    .eq('owner_id', user.id)
+
+  if (updateError) {
+    redirect(
+      `/admin/settings?mp_credentials_error=${encodeURIComponent('No se pudo guardar el modo prueba.')}`,
+    )
+  }
+
+  revalidatePath('/admin/settings')
+  redirect('/admin/settings?test_mode_saved=1')
+}
+
 export async function deleteMercadoPagoCredentials(formData: FormData): Promise<void> {
   'use server'
 
@@ -1569,6 +1624,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
     fake_notification_saved,
     fake_notification_error,
     fake_notification_deleted,
+    test_mode_saved,
+    subscription: subscriptionStatus,
   } = await searchParams
   const settings = await getSettingsData()
 
@@ -1581,6 +1638,7 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
   const primaryColor = store.primary_color ?? DEFAULT_PRIMARY_COLOR
   const secondaryColor = store.secondary_color ?? DEFAULT_SECONDARY_COLOR
   const hasMercadoPagoCredentials = Boolean(store.mp_access_token && store.mp_public_key)
+  const isTestMode = store.is_test_mode ?? false
   const freeShippingEnabled = store.free_shipping_enabled ?? true
   const freeShippingThreshold = Number(
     store.free_shipping_threshold ?? DEFAULT_FREE_SHIPPING_THRESHOLD,
@@ -1640,6 +1698,30 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
         {mp_credentials_error ? (
           <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             {mp_credentials_error}
+          </div>
+        ) : null}
+
+        {test_mode_saved === '1' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            Modo prueba actualizado correctamente
+          </div>
+        ) : null}
+
+        {subscriptionStatus === 'success' ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            ¡Plan activado correctamente!
+          </div>
+        ) : null}
+
+        {subscriptionStatus === 'failure' ? (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            Hubo un error al procesar el pago. Intentá de nuevo.
+          </div>
+        ) : null}
+
+        {subscriptionStatus === 'pending' ? (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            Pago pendiente de confirmación.
           </div>
         ) : null}
 
@@ -2428,6 +2510,30 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
+            <form action={saveTestMode} className="space-y-4">
+              <input type="hidden" name="storeId" value={store.id} />
+
+              <label className="flex items-center gap-3 rounded-lg border border-border bg-white p-4">
+                <input
+                  type="checkbox"
+                  name="isTestMode"
+                  value="true"
+                  defaultChecked={isTestMode}
+                  className="h-4 w-4 rounded border border-input text-red-600 accent-red-600"
+                />
+                <div>
+                  <p className="text-sm font-medium text-foreground">Modo prueba</p>
+                  <p className="text-xs text-muted-foreground">
+                    Usa credenciales TEST de la plataforma para probar el checkout sin cobrar de verdad.
+                  </p>
+                </div>
+              </label>
+
+              <Button type="submit" variant="outline">
+                Guardar modo prueba
+              </Button>
+            </form>
+
             {hasMercadoPagoCredentials ? (
               <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
                 <p className="font-medium">Credenciales configuradas</p>
@@ -2467,7 +2573,8 @@ export default async function AdminSettingsPage({ searchParams }: SettingsPagePr
               </div>
 
               <p className="text-xs text-muted-foreground">
-                Ambos valores deben comenzar con <span className="font-mono">APP_USR-</span>.
+                Ambos valores deben comenzar con <span className="font-mono">APP_USR-</span> o{' '}
+                <span className="font-mono">TEST-</span>.
               </p>
 
               <Button type="submit" className="bg-red-600 text-white hover:bg-red-700">

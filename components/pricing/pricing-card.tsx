@@ -8,6 +8,7 @@ import {
   getPlanDisplayPrice,
   type Plan,
 } from '@/lib/plans'
+import { SubscribeButton } from '@/components/pricing/subscribe-button'
 import { trackEvent } from '@/lib/posthog'
 import { cn } from '@/lib/utils'
 
@@ -35,6 +36,13 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
   const periodLabel = isYearly ? '/año' : '/mes'
   const isFree = plan.priceMonthly === 0
   const showCheaperBadge = plan.slug === 'emprendedor'
+  const useSubscriptionCheckout = !isFree && plan.slug !== 'empresa'
+  const buttonClassName = cn(
+    'inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition',
+    plan.isPopular
+      ? 'bg-white text-brand-800 hover:bg-white/90'
+      : 'border border-white/30 bg-white/10 text-white hover:bg-white/20',
+  )
 
   function handlePlanSelect() {
     trackEvent('plan_selected', {
@@ -96,32 +104,20 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
         <p className="mb-8 flex-1 text-sm text-white/80">{plan.features[0]}</p>
       )}
 
-      {isExternal ? (
+      {useSubscriptionCheckout ? (
+        <SubscribeButton plan={plan} isYearly={isYearly} className={buttonClassName} />
+      ) : isExternal ? (
         <a
           href={cta.href}
           target="_blank"
           rel="noopener noreferrer"
           onClick={handlePlanSelect}
-          className={cn(
-            'inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition',
-            plan.isPopular
-              ? 'bg-white text-brand-800 hover:bg-white/90'
-              : 'border border-white/30 bg-white/10 text-white hover:bg-white/20',
-          )}
+          className={buttonClassName}
         >
           {cta.label}
         </a>
       ) : (
-        <Link
-          href={cta.href}
-          onClick={handlePlanSelect}
-          className={cn(
-            'inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition',
-            plan.isPopular
-              ? 'bg-white text-brand-800 hover:bg-white/90'
-              : 'border border-white/30 bg-white/10 text-white hover:bg-white/20',
-          )}
-        >
+        <Link href={cta.href} onClick={handlePlanSelect} className={buttonClassName}>
           {cta.label}
         </Link>
       )}

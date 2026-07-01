@@ -1,4 +1,10 @@
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  createMercadoPagoPreference,
+  getMercadoPagoInitPoint,
+  resolveStoreMercadoPagoCredentials,
+  type MercadoPagoPreferenceItem,
+} from '@/lib/mercadopago'
 import { NextRequest, NextResponse } from 'next/server'
 
 type CreatePreferenceBody = {
@@ -23,28 +29,7 @@ type DbOrderItem = {
   products: { name: string } | { name: string }[] | null
 }
 
-type MercadoPagoPreferenceItem = {
-  title: string
-  quantity: number
-  unit_price: number
-  currency_id: string
-}
-
-type MercadoPagoPreferenceResponse = {
-  id: string
-  init_point: string
-  sandbox_init_point?: string
-}
-
-type MercadoPagoErrorResponse = {
-  message?: string
-  error?: string
-  cause?: Array<{ description?: string }>
-}
-
-function getProductName(
-  products: DbOrderItem['products'],
-): string {
+function getProductName(products: DbOrderItem['products']): string {
   if (!products) {
     return 'Producto'
   }
@@ -63,6 +48,12 @@ function getRequestOrigin(request: NextRequest): string {
     return configuredOrigin.replace(/\/$/, '')
   }
 
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL?.trim()
+
+  if (siteUrl) {
+    return siteUrl.replace(/\/$/, '')
+  }
+
   const forwardedHost = request.headers.get('x-forwarded-host')
   const forwardedProto = request.headers.get('x-forwarded-proto') ?? 'http'
 
@@ -71,10 +62,6 @@ function getRequestOrigin(request: NextRequest): string {
   }
 
   return new URL(request.url).origin
-}
-
-function isTestCredential(value: string): boolean {
-  return value.includes('TEST')
 }
 
 function buildConfirmationUrl(origin: string, orderId: string, status: string): string {
@@ -132,7 +119,7 @@ export async function POST(request: NextRequest) {
 
   const { data: store, error: storeError } = await admin
     .from('stores')
-    .select('id, mp_access_token, mp_public_key')
+    .select('id, mp_access_token, mp_public_key, is_test_mode')
     .eq('id', typedOrder.store_id)
     .maybeSingle()
 
@@ -140,9 +127,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tienda no encontrada' }, { status: 404 })
   }
 
-  if (!store.mp_access_token?.trim() || !store.mp_public_key?.trim()) {
+  const credentials = resolveStoreMercadoPagoCredentials(store)
+
+  if (!credentials) {
     return NextResponse.json(
-      { error: 'La tienda no tiene configurado Mercado Pago' },
+      {
+        error: store.is_test_mode
+          ? 'Activá modo prueba con MP_ACCESS_TOKEN_TEST configurado o ingresá credenciales TEST en Settings'
+          : 'La tienda no tiene configurado el medio de pago con tarjeta',
+      },
       { status: 400 },
     )
   }
@@ -181,9 +174,7 @@ export async function POST(request: NextRequest) {
     payer: {
       name: typedOrder.customer_name,
       email: typedOrder.customer_email,
-      phone: typedOrder.customer_phone
-        ? { number: typedOrder.customer_phone }
-        : undefined,
+      phone: typedOrder.customer_phone ? { number: typedOrder.customer_phone } : undefined,
     },
     ...(isDevelopment(origin)
       ? {}
@@ -198,27 +189,19 @@ export async function POST(request: NextRequest) {
     external_reference: orderId,
   }
 
-  const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${store.mp_access_token.trim()}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(preferencePayload),
-  })
+  const preferenceResult = await createMercadoPagoPreference(
+    credentials.accessToken,
+    preferencePayload,
+  )
 
-  const preferenceData = (await mpResponse.json()) as MercadoPagoPreferenceResponse &
-    MercadoPagoErrorResponse
-
-  if (!mpResponse.ok) {
-    const errorMessage =
-      preferenceData.message ??
-      preferenceData.cause?.[0]?.description ??
-      preferenceData.error ??
-      'No se pudo crear la preferencia de pago'
-
-    return NextResponse.json({ error: errorMessage }, { status: 502 })
+  if (preferenceResult.error || !preferenceResult.data) {
+    return NextResponse.json(
+      { error: preferenceResult.error ?? 'No se pudo crear la preferencia de pago' },
+      { status: 502 },
+    )
   }
+
+  const preferenceData = preferenceResult.data
 
   const { error: updateError } = await admin
     .from('orders')
@@ -236,19 +219,10 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const useSandbox =
-    isTestCredential(store.mp_access_token) || isTestCredential(store.mp_public_key)
-
-  const initPoint =
-    useSandbox && preferenceData.sandbox_init_point
-      ? preferenceData.sandbox_init_point
-      : preferenceData.init_point
+  const initPoint = getMercadoPagoInitPoint(preferenceData, credentials.isTestMode)
 
   if (!initPoint) {
-    return NextResponse.json(
-      { error: 'Mercado Pago no devolvió URL de pago' },
-      { status: 502 },
-    )
+    return NextResponse.json({ error: 'No se recibió URL de pago' }, { status: 502 })
   }
 
   return NextResponse.json({ initPoint })
