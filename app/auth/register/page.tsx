@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Mail, Lock, User, Store, Eye, EyeOff, Loader2, Check } from 'lucide-react'
 import type { SupabaseClient, User as AuthUser } from '@supabase/supabase-js'
 import { completeOnboardingRequest } from '@/lib/onboarding-client'
+import { trackEvent, identifyUser } from '@/lib/posthog'
+import { captureError, setUser } from '@/lib/sentry'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -132,6 +134,14 @@ export default function RegisterPage() {
     if (!payload.success) {
       throw new Error(payload.error ?? 'No se pudo crear la tienda')
     }
+
+    trackEvent('store_created', {
+      store_id: payload.storeId,
+      store_name: storeName.trim(),
+      slug: payload.slug,
+    })
+
+    return payload
   }
 
   const handleRegister = async (e: React.FormEvent) => {
@@ -181,7 +191,22 @@ export default function RegisterPage() {
         return
       }
 
-      await completeOnboarding()
+      const onboardingResult = await completeOnboarding()
+
+      if (authResult.status === 'authenticated') {
+        const userId = authResult.user.id
+        identifyUser(userId, {
+          email: trimmedEmail,
+          created_at: new Date().toISOString(),
+        })
+        setUser(userId, trimmedEmail)
+      }
+
+      trackEvent('user_registered', {
+        method: 'email',
+        email: trimmedEmail,
+        store_id: onboardingResult.storeId,
+      })
 
       setSuccess(true)
       router.refresh()
@@ -189,7 +214,9 @@ export default function RegisterPage() {
         router.push('/admin')
       }, 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ocurrió un error inesperado')
+      const error = err instanceof Error ? err : new Error('Ocurrió un error inesperado')
+      setError(error.message)
+      captureError(error, { flow: 'register' })
       console.error(err)
     } finally {
       setLoading(false)

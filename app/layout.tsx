@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { CartProvider } from '@/lib/cart-context'
 import { CartDrawer } from '@/components/storefront/cart-drawer'
+import { PostHogProvider } from '@/components/providers/posthog-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,10 +20,12 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body className={inter.className}>
-        <CartProvider>
-          {children}
-          <CartDrawer />
-        </CartProvider>
+        <PostHogProvider>
+          <CartProvider>
+            {children}
+            <CartDrawer />
+          </CartProvider>
+        </PostHogProvider>
       </body>
     </html>
   )

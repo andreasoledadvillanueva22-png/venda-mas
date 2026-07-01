@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { AlertCircle, Check, Clock } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { Button } from '@/components/ui/button'
+import { OrderCompletedTracker } from '@/components/analytics/order-completed-tracker'
 
 type OrderConfirmationPageProps = {
   searchParams: Promise<{
@@ -13,6 +14,7 @@ type OrderConfirmationPageProps = {
 
 type DbOrder = {
   id: string
+  store_id: string
   customer_name: string
   customer_email: string
   total: number
@@ -52,7 +54,7 @@ async function getOrderById(orderId: string): Promise<DbOrder | null> {
   const { data: order, error } = await admin
     .from('orders')
     .select(
-      'id, customer_name, customer_email, total, payment_method, status, payment_status, created_at',
+      'id, store_id, customer_name, customer_email, total, payment_method, status, payment_status, created_at',
     )
     .eq('id', orderId)
     .maybeSingle()
@@ -201,6 +203,13 @@ export default async function OrderConfirmationPage({ searchParams }: OrderConfi
   if (viewState === 'approved') {
     return (
       <PageShell>
+        <OrderCompletedTracker
+          orderId={order.id}
+          storeId={order.store_id}
+          total={Number(order.total)}
+          paymentMethod={order.payment_method}
+          source="mercadopago_confirmation"
+        />
         <div className="flex flex-col items-center gap-6 text-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
             <Check className="h-8 w-8 text-emerald-600" />

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Mail,
   MapPin,
@@ -36,6 +36,7 @@ import {
   checkoutTextareaClassName,
 } from '@/lib/checkout-styles'
 import { createClient } from '@/lib/supabase/client'
+import { trackEvent } from '@/lib/posthog'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
@@ -537,6 +538,7 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState('mercadopago')
   const [acceptTerms, setAcceptTerms] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  const checkoutStartedTracked = useRef(false)
 
   useEffect(() => {
     async function loadCheckoutStore() {
@@ -643,6 +645,20 @@ export default function CheckoutPage() {
       setPaymentMethod('mercadopago')
     }
   }, [cashOnDeliveryEnabled, paymentMethod])
+
+  useEffect(() => {
+    if (storeLoading || !storeId || items.length === 0 || checkoutStartedTracked.current) {
+      return
+    }
+
+    checkoutStartedTracked.current = true
+    trackEvent('checkout_started', {
+      store_id: storeId,
+      cart_total: subtotal,
+      items_count: items.length,
+      payment_method: paymentMethod,
+    })
+  }, [storeLoading, storeId, items.length, subtotal, paymentMethod])
 
   const availablePaymentMethods = useMemo(
     () =>

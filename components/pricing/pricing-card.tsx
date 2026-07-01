@@ -1,3 +1,5 @@
+'use client'
+
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import {
@@ -6,6 +8,7 @@ import {
   getPlanDisplayPrice,
   type Plan,
 } from '@/lib/plans'
+import { trackEvent } from '@/lib/posthog'
 import { cn } from '@/lib/utils'
 
 type PricingCardProps = {
@@ -32,6 +35,14 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
   const periodLabel = isYearly ? '/año' : '/mes'
   const isFree = plan.priceMonthly === 0
   const showCheaperBadge = plan.slug === 'emprendedor'
+
+  function handlePlanSelect() {
+    trackEvent('plan_selected', {
+      plan_name: plan.name,
+      plan_slug: plan.slug,
+      billing_period: isYearly ? 'yearly' : 'monthly',
+    })
+  }
 
   return (
     <article
@@ -90,6 +101,7 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
           href={cta.href}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={handlePlanSelect}
           className={cn(
             'inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition',
             plan.isPopular
@@ -102,6 +114,7 @@ export function PricingCard({ plan, isYearly, compact = false }: PricingCardProp
       ) : (
         <Link
           href={cta.href}
+          onClick={handlePlanSelect}
           className={cn(
             'inline-flex w-full items-center justify-center rounded-xl px-4 py-3 text-sm font-semibold transition',
             plan.isPopular

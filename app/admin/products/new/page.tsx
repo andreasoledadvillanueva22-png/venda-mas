@@ -12,6 +12,7 @@ import { Label } from '@/components/ui/label'
 import { createClient } from '@/lib/supabase/client'
 import { isValidVideoUrl } from '@/lib/video'
 import { ProductReviewsManager } from '@/components/admin/product-reviews-manager'
+import { trackEvent } from '@/lib/posthog'
 import { RichTextEditor } from '@/components/admin/rich-text-editor'
 import {
   isEmptyProductDescription,
@@ -475,15 +476,26 @@ function NewProductPageContent() {
           return
         }
       } else {
-        const { error: insertError } = await supabase.from('products').insert({
-          store_id: storeId,
-          ...productPayload,
-        })
+        const { data: insertedProduct, error: insertError } = await supabase
+          .from('products')
+          .insert({
+            store_id: storeId,
+            ...productPayload,
+          })
+          .select('id')
+          .single()
 
-        if (insertError) {
-          setError(insertError.message)
+        if (insertError || !insertedProduct) {
+          setError(insertError?.message ?? 'No se pudo crear el producto.')
           return
         }
+
+        trackEvent('product_created', {
+          product_id: insertedProduct.id,
+          store_id: storeId,
+          has_video: Boolean(form.videoUrl.trim()),
+          has_reviews: false,
+        })
       }
 
       setSuccess(true)

@@ -5,6 +5,7 @@ import { Loader2, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { isValidWaitlistEmail } from '@/lib/waitlist'
+import { trackEvent } from '@/lib/posthog'
 import { cn } from '@/lib/utils'
 
 type WaitlistFormProps = {
@@ -60,6 +61,7 @@ export function WaitlistForm({
       }
 
       setSuccess('¡Gracias! Te avisaremos cuando lancemos.')
+      trackEvent('waitlist_joined', { email: email.trim().toLowerCase() })
       setEmail('')
     } catch {
       setError('Este email ya está registrado o hubo un error.')

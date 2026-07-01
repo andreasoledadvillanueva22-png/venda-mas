@@ -6,6 +6,7 @@ import { useSearchParams } from 'next/navigation'
 import { Check, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { OrderCompletedTracker } from '@/components/analytics/order-completed-tracker'
 
 export default function CheckoutConfirmationPage() {
   return (
@@ -31,6 +32,9 @@ function CheckoutConfirmationPageContent() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
+      {orderId ? (
+        <OrderCompletedTracker orderId={orderId} source="checkout_confirmation" />
+      ) : null}
       <Card className="w-full max-w-md">
         <CardContent className="flex flex-col items-center gap-6 py-12">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
