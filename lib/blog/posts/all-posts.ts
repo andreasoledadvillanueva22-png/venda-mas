@@ -7,8 +7,8 @@ export const BLOG_POSTS: BlogPost[] = [
     excerpt:
       'Descubrí las estrategias que usan los microemprendedores argentinos para multiplicar sus ventas en Instagram este año.',
     category: 'Redes sociales',
-    imageUrl: blogImage('https://images.unsplash.com/photo-1611162617474-5b21e879e113'),
-    imageAlt: 'Emprendedora gestionando contenido de su tienda en Instagram',
+    imageUrl: blogImage('https://images.unsplash.com/photo-1611262588024-d12430b98920'),
+    imageAlt: 'Persona usando celular con Instagram abierto',
     publishedAt: '2026-06-20',
     readTime: '11 min de lectura',
     blocks: [
@@ -123,7 +123,7 @@ export const BLOG_POSTS: BlogPost[] = [
       'Todo lo que necesitás saber para lanzar tu tienda online desde cero, sin saber programar y sin gastar una fortuna.',
     category: 'Guías',
     imageUrl: blogImage('https://images.unsplash.com/photo-1556742049-0cfed4f6a45d'),
-    imageAlt: 'Persona armando su tienda online desde una notebook',
+    imageAlt: 'Emprendedor trabajando en laptop con tienda online',
     publishedAt: '2026-06-10',
     readTime: '10 min de lectura',
     blocks: [
@@ -236,7 +236,7 @@ export const BLOG_POSTS: BlogPost[] = [
       'Aceptá pagos con tarjeta, efectivo y transferencia en tu tienda online. Guía paso a paso para argentinos.',
     category: 'Tutoriales',
     imageUrl: blogImage('https://images.unsplash.com/photo-1556742111-a301076d9d18'),
-    imageAlt: 'Panel digital con métodos de cobro para ecommerce',
+    imageAlt: 'Cliente pagando con tarjeta en tienda',
     publishedAt: '2026-05-28',
     readTime: '9 min de lectura',
     blocks: [
@@ -344,7 +344,7 @@ export const BLOG_POSTS: BlogPost[] = [
       'Evitá estos 5 errores comunes que hacen perder ventas todos los días a los microemprendedores argentinos.',
     category: 'Consejos',
     imageUrl: blogImage('https://images.unsplash.com/photo-1553877522-43269d4ea984'),
-    imageAlt: 'Emprendedor analizando métricas y corrigiendo estrategia de ventas',
+    imageAlt: 'Emprendedor frustrado frente a la computadora',
     publishedAt: '2026-05-14',
     readTime: '12 min de lectura',
     blocks: [
@@ -450,7 +450,7 @@ export const BLOG_POSTS: BlogPost[] = [
       'Dejá de adivinar cuánto cobrar. Usá esta fórmula simple para pricingar tus productos y ganar dinero de verdad.',
     category: 'Finanzas',
     imageUrl: blogImage('https://images.unsplash.com/photo-1554224155-6726b3ff858f'),
-    imageAlt: 'Planilla con costos y estrategia de precios para ecommerce',
+    imageAlt: 'Calculadora y números para calcular precios',
     publishedAt: '2026-04-30',
     readTime: '10 min de lectura',
     blocks: [
@@ -563,8 +563,8 @@ export const BLOG_POSTS: BlogPost[] = [
     excerpt:
       'Comparativa completa de las dos opciones de envío más usadas en Argentina. Precios, tiempos y cómo integrarlas a tu tienda.',
     category: 'Logística',
-    imageUrl: blogImage('https://images.unsplash.com/photo-1566576912321-d58ddd7a6088'),
-    imageAlt: 'Paquetes listos para despacho en operación de ecommerce',
+    imageUrl: blogImage('https://images.unsplash.com/photo-1601584115197-04ecc0da31d7'),
+    imageAlt: 'Paquetes y cajas listas para envío',
     publishedAt: '2026-04-12',
     readTime: '9 min de lectura',
     blocks: [
