@@ -1,18 +1,21 @@
 # VendaMás SaaS - Contexto del Proyecto
 
-**Última actualización:** 02/07/2026
-**Estado:** Producción Activa - MVP completo, listo para lanzar waitlist
+**Última actualización:** 02/07/2026 - Noche
+**Estado:** Producción Activa - Dominio propio + Emails configurados + Blog SEO + Monitoreo completo
 
 ## 1. Resumen Ejecutivo
-VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comisiones por venta. Permite a los usuarios gestionar productos, órdenes, envíos y cobros con múltiples medios de pago. Cuenta con landing page de alta conversión, blog SEO con 6 artículos, pricing con comparativa vs competencia, admin personalizado, storefront dinámico y sistema completo de monitoreo.
+VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comisiones por venta. Permite a los usuarios gestionar productos, órdenes, envíos y cobros con múltiples medios de pago. Cuenta con dominio propio (vendemas.app), landing page de alta conversión, blog SEO con 6 artículos, pricing con comparativa vs competencia, admin personalizado, storefront dinámico, sistema completo de monitoreo y emails transaccionales con Resend.
 
 ## 2. Estado Actual
-- **URL Producción:** https://venda-mas.vercel.app
+- **URL Producción:** https://vendemas.app (dominio propio)
+- **URL Fallback:** https://venda-mas.vercel.app (sigue funcionando)
 - **Base de Datos:** Supabase (syxgovzmpzbymilsmdivi)
 - **Repositorio:** GitHub (andreasoledadvillanueva22-png/venda-mas)
 - **Tiendas Activas:** 2 (Andrea: `andrea-tienda`, Hector: `hector`)
 - **Estética:** 100% unificada (Azul degradado, Glassmorphism, Logo oficial)
 - **Slogan:** "Vendé online sin comisiones. Para siempre."
+- **Dominio:** vendemas.app (comprado en Cloudflare, conectado a Vercel)
+- **Emails:** Resend verificado con vendemas.app (noreply@vendamas.app)
 - **Monitoreo:** PostHog ✅, Sentry ✅, UptimeRobot ✅
 
 ## 3. Funcionalidades Implementadas (Status: ✅)
@@ -25,9 +28,11 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Integración Mercado Pago (Producción + Sandbox listo)
 - [x] Efectivo contra entrega (toggle por tienda)
 - [x] Webhooks de pago (actualización de estados)
-- [x] Dominios personalizados (estructura lista, pendiente DNS)
+- [x] Dominios personalizados (estructura lista, pendiente DNS wildcard)
 - [x] Sistema de planes y suscripciones (Free, Emprendedor, Negocio, Empresa)
 - [x] Endpoint `/api/health` para monitoreo
+- [x] Dominio propio vendemas.app configurado en Cloudflare + Vercel
+- [x] Emails transaccionales con Resend (dominio verificado)
 
 ### Storefront (Tienda)
 - [x] Diseño Premium: Header glassmorphism, cards redondeadas, footer elegante
@@ -54,6 +59,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Páginas Analytics, Design, Marketing unificadas
 - [x] Botón "Ver mi tienda" en header y sidebar
 - [x] Sección "Mi plan" en Settings
+- [x] Toggle "Modo prueba" para credenciales TEST de Mercado Pago
 
 ### Marketing & Landing
 - [x] Landing Page con waitlist funcional (rediseñada inspirada en Tienda Nube)
@@ -71,6 +77,8 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] CTAs internos hacia waitlist en cada artículo
 - [x] Newsletter signup en página principal del blog
 - [x] Imágenes relevantes de Unsplash con alt descriptivo
+- [x] Sitemap.xml dinámico generado automáticamente
+- [x] Robots.txt configurado
 - [x] Slogan: "Vendé online sin comisiones. Para siempre."
 - [x] CTA: "Crear tienda gratis"
 - [x] Diseño unificado (Azul degradado, tipografía bold)
@@ -78,10 +86,17 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Auth Pages (Login/Register) con estilo glassmorphism
 
 ### Monitoreo & Seguridad
-- [x] PostHog: Analytics de producto, funnels, grabación de sesiones
-- [x] Sentry: Errores en tiempo real, performance
+- [x] PostHog: Analytics de producto, funnels, grabación de sesiones (región US Cloud)
+- [x] Sentry: Errores en tiempo real, performance (proyecto: venda-mas)
 - [x] UptimeRobot: 2 monitores (main + health check) cada 5 min
 - [x] Snyk: Scripts de seguridad de dependencias
+
+### Emails Transaccionales
+- [x] Resend integrado con dominio vendamas.app verificado
+- [x] FROM_EMAIL configurado: noreply@vendamas.app
+- [x] Template de confirmación de compra implementado
+- [x] Template de bienvenida para waitlist implementado
+- [ ] ️ Email de prueba NO llegó (pendiente debuggear)
 
 ### Componentes UI
 - [x] Button (variantes: default, outline, secondary, ghost)
@@ -93,16 +108,17 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 ## 4. Pendientes (Priorizados)
 
 ### PRIORIDAD ALTA (Críticos para lanzar)
-- [ ] **Prueba Sandbox MP** con credenciales TEST- en Hector (validar checkout E2E)
-- [ ] **Email transaccional** con Resend (confirmación de compra)
-- [ ] **Sitemap.xml + robots.txt** (SEO básico para indexación)
-- [ ] **Sistema de cobro de suscripciones** (integrar MP para cobrar los planes)
+- [ ] **Debuggear emails de Resend:** El email de prueba no llegó. Revisar logs de Resend, verificar API key, revisar código de envío
+- [ ] **Prueba Sandbox MP E2E:** Configurar credenciales TEST en Hector, validar checkout completo con tarjeta de prueba
+- [ ] **Variables de entorno faltantes:** Agregar MP_ACCESS_TOKEN_TEST, MP_PUBLIC_KEY_TEST, RESEND_API_KEY en Vercel
+- [ ] **Wildcard DNS:** Configurar registro `*.vendemas.app` en Cloudflare para subdominios de tiendas
 
 ### PRIORIDAD MEDIA
-- [ ] **Dominio:** Comprar `vendemas.app` y configurar DNS wildcard
 - [ ] **Soporte CSV** para importar reseñas masivamente
-- [ ] **Imágenes reales:** Reemplazar placeholders de Unsplash con fotos reales
+- [ ] **Imágenes reales:** Reemplazar placeholders de Unsplash con fotos reales de emprendedores
 - [ ] **Redirects** para slugs viejos del blog (si se compartieron links)
+- [ ] **Verificar sitemap.xml** en producción (accesible y con todas las URLs)
+- [ ] **Verificar sistema de suscripciones** (checkout desde pricing → MP → webhook → activación de plan)
 
 ### PRIORIDAD BAJA
 - [ ] Integración logística (Andreani/Correo)
@@ -110,6 +126,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [ ] Analytics avanzado (gráficos de conversión, LTV)
 - [ ] Múltiples billeteras (Modo, Ualá, etc.)
 - [ ] Investigación de competencia (Tienda Nube, Pistacho, Empretienda)
+- [ ] Estrategia de marketing para waitlist (copys, imágenes, calendario editorial)
 
 ## 5. Arquitectura Técnica
 - **Frontend:** Next.js 14 (App Router), React, Tailwind CSS (v4)
@@ -118,10 +135,15 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - **Estilos:** Componentes UI reutilizables con variantes premium
 - **Colores:** `brand-50` a `brand-900` (Azul), `accent` (Rojo para CTA)
 - **Logo:** https://i.ibb.co/rr2Wc9x/vendamas-logo.png
+- **Dominio:** vendemas.app (Cloudflare → Vercel)
+- **Emails:** Resend (noreply@vendamas.app)
 
 ## 6. Historial Reciente
-- **02/07/2026:** Blog SEO completo (6 artículos, meta tags, JSON-LD, CTAs, imágenes corregidas)
-- **02/07/2026:** Monitoreo completo (PostHog, Sentry, UptimeRobot)
+- **02/07/2026 - Noche:** Dominio vendemas.app comprado en Cloudflare y conectado a Vercel
+- **02/07/2026 - Noche:** Resend verificado con vendemas.app, FROM_EMAIL actualizado
+- **02/07/2026 - Tarde:** Blog SEO completo (6 artículos, meta tags, JSON-LD, CTAs, imágenes corregidas)
+- **02/07/2026 - Tarde:** Loop completo implementado (Sandbox MP, emails Resend, sitemap/robots, suscripciones)
+- **02/07/2026 - Mañana:** Monitoreo completo (PostHog, Sentry, UptimeRobot)
 - **01/07/2026 - Noche:** Rediseño inspirado en Tienda Nube (Landing, Pricing, Blog)
 - **01/07/2026 - Tarde:** Página de Pricing con 4 planes + tabla comparativa
 - **01/07/2026 - Tarde:** Íconos de redes sociales en footer
@@ -136,12 +158,12 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 |----------|-----------|-------------------|
 | Vercel | $0 | $20 USD/mes |
 | Supabase | $0 | $25 USD/mes |
-| Dominio .app | $14/año | $14/año |
+| Dominio .app | $14.20/año | $14.20/año |
 | Resend | $0 (3000 emails) | $20 USD/mes |
 | PostHog | $0 (1M eventos) | $20 USD/mes |
 | Sentry | $0 (5K errores) | $26 USD/mes |
 | UptimeRobot | $0 (50 monitores) | $7 USD/mes |
-| **TOTAL** | **~$0 ARS/mes** | **~$130.000 ARS/mes** |
+| **TOTAL** | **~$14.20 USD/año** | **~$130.000 ARS/mes** |
 
 ## 8. Pricing Implementado
 | Plan | Precio ARS/mes | Precio ARS/año | Productos | Órdenes/mes |
@@ -151,7 +173,21 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 | Negocio | $19.900 | $199.000 | 200 | 1000 |
 | Empresa | $39.900 | $399.000 | Ilimitado | Ilimitado |
 
-## 9. Reglas de Desarrollo
+## 9. Variables de Entorno (Vercel)
+| Variable | Valor | Estado |
+|----------|-------|--------|
+| NEXT_PUBLIC_SENTRY_DSN | https://789ea43d... | ✅ Configurada |
+| SENTRY_AUTH_TOKEN | sntrys_eyJ... | ✅ Configurada |
+| SENTRY_ORG | vendamas | ✅ Configurada |
+| SENTRY_PROJECT | venda-mas | ✅ Configurada |
+| NEXT_PUBLIC_POSTHOG_KEY | phc_A2yRan... | ✅ Configurada |
+| NEXT_PUBLIC_POSTHOG_HOST | https://us.posthog.com | ✅ Configurada |
+| RESEND_API_KEY | re_xxxxx | ⚠️ Verificar |
+| FROM_EMAIL | noreply@vendamas.app | ✅ Configurada |
+| MP_ACCESS_TOKEN_TEST | TEST-xxxxx | ❌ Pendiente |
+| MP_PUBLIC_KEY_TEST | TEST-xxxxx | ❌ Pendiente |
+
+## 10. Reglas de Desarrollo
 1. **No romper multi-tenancy:** Siempre filtrar por `store_id`
 2. **Seguridad:** No commitear `.env.local`. Usar variables de Vercel
 3. **Calidad:** TypeScript estricto. `npm run build` debe pasar antes de deployar
