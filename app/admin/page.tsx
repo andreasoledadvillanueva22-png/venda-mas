@@ -71,3 +71,5 @@ export default async function AdminDashboard() {
     </div>
   )
 }
+// Deploy para activar variables de PostHog y se
+
