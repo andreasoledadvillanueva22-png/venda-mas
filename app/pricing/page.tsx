@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { MarketingHeader } from '@/components/marketing/marketing-header'
 import { MarketingFooter } from '@/components/marketing/marketing-footer'
 import { PricingSection } from '@/components/pricing/pricing-section'
+import { MpTestModeBanner } from '@/components/mercadopago/mp-test-mode-banner'
 import { fetchPublicPlans } from '@/lib/plans-server'
 
 export const metadata: Metadata = {
@@ -39,6 +40,9 @@ export default async function PricingPage() {
             <p className="mt-6 text-lg text-white/90 sm:text-xl">
               Sin comisiones por venta. Sin letra chica. Cancelá cuando quieras.
             </p>
+            <div className="mx-auto mt-8 max-w-xl">
+              <MpTestModeBanner />
+            </div>
           </div>
 
           <PricingSection plans={plans} />

@@ -58,12 +58,55 @@ function isTestCredential(value: string): boolean {
   return value.includes('TEST')
 }
 
+export function isPlatformTestMode(): boolean {
+  return process.env.MP_MODE?.trim().toLowerCase() === 'test'
+}
+
+function resolvePlatformAccessToken(): string | null {
+  if (isPlatformTestMode()) {
+    return process.env.MP_ACCESS_TOKEN_TEST?.trim() ?? null
+  }
+
+  return (
+    process.env.MP_ACCESS_TOKEN_PROD?.trim() ??
+    process.env.NEXT_MP_CLIENT_SECRET?.trim() ??
+    process.env.MP_ACCESS_TOKEN?.trim() ??
+    null
+  )
+}
+
+function resolvePlatformPublicKey(): string | null {
+  if (isPlatformTestMode()) {
+    return process.env.MP_PUBLIC_KEY_TEST?.trim() ?? null
+  }
+
+  return (
+    process.env.MP_PUBLIC_KEY_PROD?.trim() ??
+    process.env.NEXT_MP_CLIENT_ID?.trim() ??
+    process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim() ??
+    null
+  )
+}
+
+/** Credenciales de plataforma (suscripciones / sandbox global). Solo servidor. */
+export const mpConfig = {
+  get isTestMode() {
+    return isPlatformTestMode()
+  },
+  get publicKey() {
+    return resolvePlatformPublicKey()
+  },
+  get accessToken() {
+    return resolvePlatformAccessToken()
+  },
+}
+
 export function isMercadoPagoTestMode(store: MercadoPagoStore): boolean {
-  if (store.is_test_mode) {
+  if (isPlatformTestMode()) {
     return true
   }
 
-  if (process.env.NODE_ENV === 'development') {
+  if (store.is_test_mode) {
     return true
   }
 
@@ -93,11 +136,12 @@ function getPlatformTestCredentials(): MercadoPagoCredentials | null {
 }
 
 function getPlatformProductionCredentials(): MercadoPagoCredentials | null {
-  const accessToken =
-    process.env.MP_ACCESS_TOKEN_PROD?.trim() ?? process.env.MP_ACCESS_TOKEN?.trim()
-  const publicKey =
-    process.env.MP_PUBLIC_KEY_PROD?.trim() ??
-    process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim()
+  if (isPlatformTestMode()) {
+    return null
+  }
+
+  const accessToken = mpConfig.accessToken
+  const publicKey = mpConfig.publicKey
 
   if (!accessToken || !publicKey) {
     return null
@@ -113,9 +157,16 @@ function getPlatformProductionCredentials(): MercadoPagoCredentials | null {
 export function resolveStoreMercadoPagoCredentials(
   store: MercadoPagoStore,
 ): MercadoPagoCredentials | null {
+  if (isPlatformTestMode()) {
+    const platformTest = getPlatformTestCredentials()
+    if (platformTest) {
+      return platformTest
+    }
+  }
+
   const testMode = isMercadoPagoTestMode(store)
 
-  if (testMode) {
+  if (testMode && !isPlatformTestMode()) {
     const platformTest = getPlatformTestCredentials()
     if (platformTest) {
       return platformTest
@@ -126,6 +177,9 @@ export function resolveStoreMercadoPagoCredentials(
   const publicKey = store.mp_public_key?.trim()
 
   if (!accessToken || !publicKey) {
+    if (testMode) {
+      return getPlatformTestCredentials()
+    }
     return null
   }
 
@@ -137,11 +191,7 @@ export function resolveStoreMercadoPagoCredentials(
 }
 
 export function resolvePlatformMercadoPagoCredentials(): MercadoPagoCredentials | null {
-  const useTest =
-    process.env.NODE_ENV === 'development' ||
-    process.env.MP_USE_TEST_CREDENTIALS === 'true'
-
-  if (useTest) {
+  if (isPlatformTestMode()) {
     return getPlatformTestCredentials() ?? getPlatformProductionCredentials()
   }
 

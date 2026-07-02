@@ -25,6 +25,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { useCart } from '@/lib/cart-context'
 import { CheckoutSteps } from '@/components/storefront/checkout-steps'
+import { MpTestModeBanner } from '@/components/mercadopago/mp-test-mode-banner'
 import {
   checkoutCardClassName,
   checkoutHeaderClassName,
@@ -950,6 +951,7 @@ export default function CheckoutPage() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        <MpTestModeBanner variant="checkout" />
         <CheckoutSteps className="mb-8" />
         {submitError && (
           <div className="mb-6 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
