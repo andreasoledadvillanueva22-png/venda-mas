@@ -1,10 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin'
-import {
-  createMercadoPagoPreference,
-  getMercadoPagoInitPoint,
-  resolvePlatformMercadoPagoCredentials,
-  type MercadoPagoPreferencePayload,
-} from '@/lib/mercadopago'
+import { mercadoPagoProvider } from '@/lib/payments/mercadopago/preferences'
 import { DEFAULT_PLANS, type Plan } from '@/lib/plans'
 
 function mapPlanRow(row: {
@@ -104,73 +99,42 @@ export async function createSubscriptionPreference({
     return { error: 'Plan no válido para suscripción' as const }
   }
 
-  const credentials = resolvePlatformMercadoPagoCredentials()
-
-  if (!credentials) {
-    return { error: 'No hay credenciales de pago configuradas en la plataforma' as const }
-  }
-
   const externalReference = `subscription:${storeId}:${planId}:${Date.now()}`
 
-  const payload: MercadoPagoPreferencePayload = {
-    items: [
-      {
-        title: `Plan ${plan.name} - VendaMás`,
-        quantity: 1,
-        unit_price: plan.priceMonthly,
-        currency_id: 'ARS',
+  try {
+    const preference = await mercadoPagoProvider.createPreference({
+      items: [
+        {
+          title: `Plan ${plan.name} - VendaMás`,
+          quantity: 1,
+          unit_price: plan.priceMonthly,
+          currency_id: 'ARS',
+        },
+      ],
+      payer: {
+        name: payerName,
+        email: payerEmail,
       },
-    ],
-    payer: {
-      name: payerName,
-      email: payerEmail,
-    },
-    back_urls: {
-      success: `${origin}/admin/settings?subscription=success`,
-      failure: `${origin}/admin/settings?subscription=failure`,
-      pending: `${origin}/admin/settings?subscription=pending`,
-    },
-    auto_return: 'approved',
-    external_reference: externalReference,
-    metadata: {
-      type: 'subscription',
-      plan_id: planId,
-      store_id: storeId,
-      user_id: userId,
-    },
+      back_urls: {
+        success: `${origin}/admin/settings?subscription=success`,
+        failure: `${origin}/admin/settings?subscription=failure`,
+        pending: `${origin}/admin/settings?subscription=pending`,
+      },
+      external_reference: externalReference,
+      metadata: {
+        type: 'subscription',
+        plan_id: planId,
+        store_id: storeId,
+        user_id: userId,
+      },
+    })
+
+    return { initPoint: preference.initPoint }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'No se pudo crear la preferencia de suscripción'
+    console.error('DEBUG createSubscriptionPreference: error', message)
+    return { error: message }
   }
-
-  const result = await createMercadoPagoPreference(credentials.accessToken, payload)
-
-  if (result.error || !result.data) {
-    console.error('DEBUG createSubscriptionPreference: error', result.error)
-    return { error: result.error ?? 'No se pudo crear la preferencia de suscripción' }
-  }
-
-  console.log('DEBUG createSubscriptionPreference: isTestMode', credentials.isTestMode)
-  console.log(
-    'DEBUG createSubscriptionPreference: init_point exists:',
-    !!result.data.init_point,
-  )
-  console.log(
-    'DEBUG createSubscriptionPreference: sandbox_init_point exists:',
-    !!result.data.sandbox_init_point,
-  )
-
-  const initPoint = getMercadoPagoInitPoint(result.data, credentials.isTestMode)
-
-  if (!initPoint) {
-    return {
-      error: credentials.isTestMode
-        ? 'No se recibió sandbox_init_point. Verificá MP_MODE=test y credenciales de prueba.'
-        : 'No se recibió URL de pago',
-    }
-  }
-
-  console.log('DEBUG createSubscriptionPreference: redirecting to', initPoint)
-  console.log('DEBUG createSubscriptionPreference: is sandbox URL', initPoint.includes('sandbox'))
-
-  return { initPoint }
 }
 
 export async function activateSubscription({
@@ -181,7 +145,7 @@ export async function activateSubscription({
   storeId: string
   userId: string
   planId: string
-}) {
+}): Promise<string> {
   const admin = createAdminClient()
   const periodEnd = new Date()
   periodEnd.setDate(periodEnd.getDate() + 30)
@@ -195,16 +159,25 @@ export async function activateSubscription({
     throw new Error(storeError.message)
   }
 
-  const { error: subscriptionError } = await admin.from('subscriptions').insert({
-    user_id: userId,
-    store_id: storeId,
-    plan_id: planId,
-    status: 'active',
-    current_period_start: new Date().toISOString(),
-    current_period_end: periodEnd.toISOString(),
-  })
+  const { data: subscription, error: subscriptionError } = await admin
+    .from('subscriptions')
+    .insert({
+      user_id: userId,
+      store_id: storeId,
+      plan_id: planId,
+      status: 'active',
+      detailed_status: 'active',
+      current_period_start: new Date().toISOString(),
+      current_period_end: periodEnd.toISOString(),
+      next_billing_date: periodEnd.toISOString(),
+      retry_count: 0,
+    })
+    .select('id')
+    .single()
 
-  if (subscriptionError) {
-    throw new Error(subscriptionError.message)
+  if (subscriptionError || !subscription) {
+    throw new Error(subscriptionError?.message ?? 'No se pudo crear la suscripción')
   }
+
+  return subscription.id
 }

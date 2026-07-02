@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { resolvePlatformMercadoPagoCredentials } from '@/lib/mercadopago'
+import { debugMercadoPagoCredentials } from '@/lib/payments/mercadopago/debug'
 import { createSubscriptionPreference } from '@/lib/subscriptions'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -83,18 +83,27 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tu cuenta no tiene email configurado' }, { status: 400 })
   }
 
-  const credentials = resolvePlatformMercadoPagoCredentials()
+  const credentialsDebug = debugMercadoPagoCredentials()
 
-  if (!credentials) {
+  if (
+    credentialsDebug.isTestMode &&
+    !credentialsDebug.testCredentialsExist
+  ) {
     return NextResponse.json(
-      { error: 'Credenciales de pago no configuradas para la plataforma' },
+      { error: 'Credenciales TEST no configuradas (MP_ACCESS_TOKEN_TEST / MP_PUBLIC_KEY_TEST)' },
       { status: 500 },
     )
   }
 
-  console.log('=== DEBUG subscriptions/create-preference ===')
-  console.log('isTestMode:', credentials.isTestMode)
-  console.log('accessToken starts with:', credentials.accessToken.substring(0, 10))
+  if (
+    !credentialsDebug.isTestMode &&
+    !credentialsDebug.productionCredentialsExist
+  ) {
+    return NextResponse.json(
+      { error: 'Credenciales PROD no configuradas (MP_ACCESS_TOKEN_PROD / MP_PUBLIC_KEY_PROD)' },
+      { status: 500 },
+    )
+  }
 
   const result = await createSubscriptionPreference({
     planId,
@@ -109,8 +118,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 502 })
   }
 
-  console.log('Redirecting to:', result.initPoint)
-  console.log('isTestMode:', credentials.isTestMode)
+  if (!result.initPoint) {
+    return NextResponse.json({ error: 'No se recibió URL de pago' }, { status: 502 })
+  }
 
-  return NextResponse.json({ initPoint: result.initPoint, isTestMode: credentials.isTestMode })
+  console.log('Redirecting to:', result.initPoint)
+  console.log('isTestMode:', credentialsDebug.isTestMode)
+  console.log('is sandbox URL:', result.initPoint.includes('sandbox'))
+
+  return NextResponse.json({
+    initPoint: result.initPoint,
+    isTestMode: credentialsDebug.isTestMode,
+  })
 }
