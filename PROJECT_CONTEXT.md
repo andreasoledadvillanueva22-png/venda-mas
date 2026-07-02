@@ -1,10 +1,10 @@
 # VendaMás SaaS - Contexto del Proyecto
 
-**Última actualización:** 02/07/2026 - Noche
-**Estado:** Producción Activa - Dominio propio + Emails configurados + Blog SEO + Monitoreo completo
+**Última actualización:** 02/07/2026 - Mediodía
+**Estado:** Producción Activa - Dominio propio + Sistema TEST/PRODUCCIÓN MP implementado + Debug de pago en curso
 
 ## 1. Resumen Ejecutivo
-VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comisiones por venta. Permite a los usuarios gestionar productos, órdenes, envíos y cobros con múltiples medios de pago. Cuenta con dominio propio (vendemas.app), landing page de alta conversión, blog SEO con 6 artículos, pricing con comparativa vs competencia, admin personalizado, storefront dinámico, sistema completo de monitoreo y emails transaccionales con Resend.
+VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comisiones por venta. Permite a los usuarios gestionar productos, órdenes, envíos y cobros con múltiples medios de pago. Cuenta con dominio propio (vendemas.app), landing page de alta conversión, blog SEO con 6 artículos, pricing con comparativa vs competencia, admin personalizado, storefront dinámico, sistema completo de monitoreo, emails transaccionales con Resend y sistema de credenciales TEST/PRODUCCIÓN para Mercado Pago.
 
 ## 2. Estado Actual
 - **URL Producción:** https://vendemas.app (dominio propio)
@@ -15,8 +15,9 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - **Estética:** 100% unificada (Azul degradado, Glassmorphism, Logo oficial)
 - **Slogan:** "Vendé online sin comisiones. Para siempre."
 - **Dominio:** vendemas.app (comprado en Cloudflare, conectado a Vercel)
-- **Emails:** Resend verificado con vendemas.app (noreply@vendamas.app)
+- **Emails:** Resend verificado con vendamas.app (noreply@vendamas.app)
 - **Monitoreo:** PostHog ✅, Sentry ✅, UptimeRobot ✅
+- **Mercado Pago:** Sistema TEST/PRODUCCIÓN implementado, debug de pago en curso
 
 ## 3. Funcionalidades Implementadas (Status: ✅)
 
@@ -25,9 +26,11 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Registro y onboarding de usuarios
 - [x] Dashboard de Admin (KPIs, navegación)
 - [x] Checkout como invitado (Guest Checkout) - 5 pasos visuales premium
-- [x] Integración Mercado Pago (Producción + Sandbox listo)
+- [x] Integración Mercado Pago (Producción + Sandbox)
+- [x] Sistema de credenciales TEST/PRODUCCIÓN con variable MP_MODE
+- [x] Badge visual de modo prueba en UI
 - [x] Efectivo contra entrega (toggle por tienda)
-- [x] Webhooks de pago (actualización de estados)
+- [x] Webhooks de pago (estructura lista, pendiente validación)
 - [x] Dominios personalizados (estructura lista, pendiente DNS wildcard)
 - [x] Sistema de planes y suscripciones (Free, Emprendedor, Negocio, Empresa)
 - [x] Endpoint `/api/health` para monitoreo
@@ -96,7 +99,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] FROM_EMAIL configurado: noreply@vendamas.app
 - [x] Template de confirmación de compra implementado
 - [x] Template de bienvenida para waitlist implementado
-- [ ] ️ Email de prueba NO llegó (pendiente debuggear)
+- [ ]  Email de prueba NO llegó (pendiente debuggear)
 
 ### Componentes UI
 - [x] Button (variantes: default, outline, secondary, ghost)
@@ -104,21 +107,22 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [x] Input (rounded-xl, focus ring brand)
 - [x] Badge (success, warning, info, destructive)
 - [x] Table (header brand-50, hover suave)
+- [x] Banner de modo prueba (mp-test-mode-banner.tsx)
 
 ## 4. Pendientes (Priorizados)
 
 ### PRIORIDAD ALTA (Críticos para lanzar)
+- [ ] **Debuggear error de pago en Sandbox:** Error "Una de las partes es de prueba" al intentar pagar. Posibles causas: variables de entorno no aplicadas, sesión de MP en navegador, o código no usando credenciales TEST
 - [ ] **Debuggear emails de Resend:** El email de prueba no llegó. Revisar logs de Resend, verificar API key, revisar código de envío
-- [ ] **Prueba Sandbox MP E2E:** Configurar credenciales TEST en Hector, validar checkout completo con tarjeta de prueba
-- [ ] **Variables de entorno faltantes:** Agregar MP_ACCESS_TOKEN_TEST, MP_PUBLIC_KEY_TEST, RESEND_API_KEY en Vercel
-- [ ] **Wildcard DNS:** Configurar registro `*.vendemas.app` en Cloudflare para subdominios de tiendas
+- [ ] **Validar flujo completo de suscripción:** Pago → Webhook → Activación de plan → Email de confirmación
+- [ ] **Variables de entorno en Vercel:** Verificar que MP_MODE=test y NEXT_PUBLIC_MP_MODE=test estén configuradas
 
 ### PRIORIDAD MEDIA
+- [ ] **Wildcard DNS:** Configurar registro `*.vendemas.app` en Cloudflare para subdominios de tiendas
 - [ ] **Soporte CSV** para importar reseñas masivamente
 - [ ] **Imágenes reales:** Reemplazar placeholders de Unsplash con fotos reales de emprendedores
 - [ ] **Redirects** para slugs viejos del blog (si se compartieron links)
 - [ ] **Verificar sitemap.xml** en producción (accesible y con todas las URLs)
-- [ ] **Verificar sistema de suscripciones** (checkout desde pricing → MP → webhook → activación de plan)
 
 ### PRIORIDAD BAJA
 - [ ] Integración logística (Andreani/Correo)
@@ -127,6 +131,7 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - [ ] Múltiples billeteras (Modo, Ualá, etc.)
 - [ ] Investigación de competencia (Tienda Nube, Pistacho, Empretienda)
 - [ ] Estrategia de marketing para waitlist (copys, imágenes, calendario editorial)
+- [ ] Login con Google (OAuth)
 
 ## 5. Arquitectura Técnica
 - **Frontend:** Next.js 14 (App Router), React, Tailwind CSS (v4)
@@ -137,21 +142,20 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 - **Logo:** https://i.ibb.co/rr2Wc9x/vendamas-logo.png
 - **Dominio:** vendemas.app (Cloudflare → Vercel)
 - **Emails:** Resend (noreply@vendamas.app)
+- **Pagos:** Mercado Pago (Sistema TEST/PRODUCCIÓN con MP_MODE)
 
 ## 6. Historial Reciente
-- **02/07/2026 - Noche:** Dominio vendemas.app comprado en Cloudflare y conectado a Vercel
-- **02/07/2026 - Noche:** Resend verificado con vendemas.app, FROM_EMAIL actualizado
-- **02/07/2026 - Tarde:** Blog SEO completo (6 artículos, meta tags, JSON-LD, CTAs, imágenes corregidas)
-- **02/07/2026 - Tarde:** Loop completo implementado (Sandbox MP, emails Resend, sitemap/robots, suscripciones)
-- **02/07/2026 - Mañana:** Monitoreo completo (PostHog, Sentry, UptimeRobot)
+- **02/07/2026 - Mediodía:** Sistema TEST/PRODUCCIÓN de MP implementado con badge visual
+- **02/07/2026 - Mediodía:** Debug de error "Una de las partes es de prueba" en Sandbox
+- **02/07/2026 - Mañana:** Dominio vendemas.app comprado en Cloudflare y conectado a Vercel
+- **02/07/2026 - Mañana:** Resend verificado con vendamas.app, FROM_EMAIL actualizado
+- **02/07/2026 - Madrugada:** Blog SEO completo (6 artículos, meta tags, JSON-LD, CTAs, imágenes corregidas)
+- **02/07/2026 - Madrugada:** Loop completo implementado (Sandbox MP, emails Resend, sitemap/robots, suscripciones)
+- **01/07/2026 - Noche:** Monitoreo completo (PostHog, Sentry, UptimeRobot)
 - **01/07/2026 - Noche:** Rediseño inspirado en Tienda Nube (Landing, Pricing, Blog)
 - **01/07/2026 - Tarde:** Página de Pricing con 4 planes + tabla comparativa
 - **01/07/2026 - Tarde:** Íconos de redes sociales en footer
 - **01/07/2026 - Mañana:** Carrusel de reseñas + importación masiva + efectivo contra entrega
-- **01/07/2026 - Mañana:** Fix estética storefront, Design page, Marketing page
-- **30/06/2026:** Unificación estética premium + Logo oficial
-- **29/06/2026:** Editor TipTap, compartir en redes, video, reseñas importadas
-- **29/06/2026:** Landing Page con Waitlist funcional
 
 ## 7. Costos Operativos (estimados)
 | Servicio | Plan Free | Plan Pro (escala) |
@@ -184,8 +188,13 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 | NEXT_PUBLIC_POSTHOG_HOST | https://us.posthog.com | ✅ Configurada |
 | RESEND_API_KEY | re_xxxxx | ⚠️ Verificar |
 | FROM_EMAIL | noreply@vendamas.app | ✅ Configurada |
-| MP_ACCESS_TOKEN_TEST | TEST-xxxxx | ❌ Pendiente |
-| MP_PUBLIC_KEY_TEST | TEST-xxxxx | ❌ Pendiente |
+| NEXT_MP_CLIENT_ID | 7658886029761092 | ✅ Configurada (producción) |
+| NEXT_MP_CLIENT_SECRET | APP_USR-... | ✅ Configurada (producción) |
+| NEXT_MP_REDIRECT_URI | https://vendemas.app/api/mercadopago/auth | ✅ Configurada |
+| MP_ACCESS_TOKEN_TEST | TEST-... | ✅ Configurada |
+| MP_PUBLIC_KEY_TEST | TEST-... | ✅ Configurada |
+| MP_MODE | test | ⚠️ Verificar |
+| NEXT_PUBLIC_MP_MODE | test | ⚠️ Verificar |
 
 ## 10. Reglas de Desarrollo
 1. **No romper multi-tenancy:** Siempre filtrar por `store_id`
@@ -195,3 +204,4 @@ VendaMás es una plataforma SaaS multi-tenant para crear tiendas online sin comi
 5. **Performance:** Usar `next/image` para optimización de imágenes
 6. **Slogan:** Nunca mencionar "Mercado Pago" en textos de marketing (solo en configuración técnica)
 7. **Contenido:** Español rioplatense, tono cercano y práctico
+8. **Modo prueba:** Usar MP_MODE=test para pruebas, production para producción
