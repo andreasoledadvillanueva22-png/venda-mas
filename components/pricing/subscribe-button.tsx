@@ -34,7 +34,11 @@ export function SubscribeButton({ plan, isYearly, className }: SubscribeButtonPr
         body: JSON.stringify({ planId: plan.id }),
       })
 
-      const data = (await response.json()) as { initPoint?: string; error?: string }
+      const data = (await response.json()) as {
+        initPoint?: string
+        error?: string
+        isTestMode?: boolean
+      }
 
       if (response.status === 401) {
         router.push(`/auth/register?plan=${encodeURIComponent(plan.slug)}`)
@@ -44,6 +48,11 @@ export function SubscribeButton({ plan, isYearly, className }: SubscribeButtonPr
       if (!response.ok || !data.initPoint) {
         setError(data.error ?? 'No se pudo iniciar el pago. Intentá de nuevo.')
         return
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[SubscribeButton] isTestMode:', data.isTestMode)
+        console.log('[SubscribeButton] initPoint:', data.initPoint)
       }
 
       window.location.href = data.initPoint

@@ -222,8 +222,20 @@ export async function POST(request: NextRequest) {
   const initPoint = getMercadoPagoInitPoint(preferenceData, credentials.isTestMode)
 
   if (!initPoint) {
-    return NextResponse.json({ error: 'No se recibió URL de pago' }, { status: 502 })
+    return NextResponse.json(
+      {
+        error: credentials.isTestMode
+          ? 'No se recibió sandbox_init_point. Verificá MP_MODE=test y credenciales de prueba.'
+          : 'No se recibió URL de pago',
+      },
+      { status: 502 },
+    )
   }
 
-  return NextResponse.json({ initPoint })
+  console.log('=== DEBUG mercadopago/create-preference ===')
+  console.log('isTestMode:', credentials.isTestMode)
+  console.log('Redirecting to:', initPoint)
+  console.log('is sandbox URL:', initPoint.includes('sandbox'))
+
+  return NextResponse.json({ initPoint, isTestMode: credentials.isTestMode })
 }

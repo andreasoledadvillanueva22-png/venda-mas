@@ -54,12 +54,28 @@ export type MercadoPagoPayment = {
   metadata?: Record<string, unknown> | null
 }
 
+function maskCredential(value: string | null | undefined, visible = 10): string {
+  if (!value) {
+    return '(missing)'
+  }
+
+  return value.length <= visible ? value : `${value.substring(0, visible)}...`
+}
+
 function isTestCredential(value: string): boolean {
   return value.includes('TEST')
 }
 
 export function isPlatformTestMode(): boolean {
-  return process.env.MP_MODE?.trim().toLowerCase() === 'test'
+  const mpMode = process.env.MP_MODE?.trim().toLowerCase()
+  const publicMpMode = process.env.NEXT_PUBLIC_MP_MODE?.trim().toLowerCase()
+
+  return (
+    mpMode === 'test' ||
+    publicMpMode === 'test' ||
+    process.env.MP_USE_TEST_CREDENTIALS === 'true' ||
+    process.env.NODE_ENV === 'development'
+  )
 }
 
 function resolvePlatformAccessToken(): string | null {
@@ -69,7 +85,6 @@ function resolvePlatformAccessToken(): string | null {
 
   return (
     process.env.MP_ACCESS_TOKEN_PROD?.trim() ??
-    process.env.NEXT_MP_CLIENT_SECRET?.trim() ??
     process.env.MP_ACCESS_TOKEN?.trim() ??
     null
   )
@@ -82,7 +97,6 @@ function resolvePlatformPublicKey(): string | null {
 
   return (
     process.env.MP_PUBLIC_KEY_PROD?.trim() ??
-    process.env.NEXT_MP_CLIENT_ID?.trim() ??
     process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim() ??
     null
   )
@@ -110,6 +124,10 @@ export function isMercadoPagoTestMode(store: MercadoPagoStore): boolean {
     return true
   }
 
+  if (process.env.NODE_ENV === 'development') {
+    return true
+  }
+
   const token = store.mp_access_token?.trim()
   const key = store.mp_public_key?.trim()
 
@@ -119,10 +137,8 @@ export function isMercadoPagoTestMode(store: MercadoPagoStore): boolean {
 }
 
 function getPlatformTestCredentials(): MercadoPagoCredentials | null {
-  const accessToken =
-    process.env.MP_ACCESS_TOKEN_TEST?.trim() ?? process.env.MP_ACCESS_TOKEN?.trim()
-  const publicKey =
-    process.env.MP_PUBLIC_KEY_TEST?.trim() ?? process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY?.trim()
+  const accessToken = process.env.MP_ACCESS_TOKEN_TEST?.trim()
+  const publicKey = process.env.MP_PUBLIC_KEY_TEST?.trim()
 
   if (!accessToken || !publicKey) {
     return null
@@ -136,12 +152,8 @@ function getPlatformTestCredentials(): MercadoPagoCredentials | null {
 }
 
 function getPlatformProductionCredentials(): MercadoPagoCredentials | null {
-  if (isPlatformTestMode()) {
-    return null
-  }
-
-  const accessToken = mpConfig.accessToken
-  const publicKey = mpConfig.publicKey
+  const accessToken = resolvePlatformAccessToken()
+  const publicKey = resolvePlatformPublicKey()
 
   if (!accessToken || !publicKey) {
     return null
@@ -150,7 +162,7 @@ function getPlatformProductionCredentials(): MercadoPagoCredentials | null {
   return {
     accessToken,
     publicKey,
-    isTestMode: isTestCredential(accessToken) || isTestCredential(publicKey),
+    isTestMode: false,
   }
 }
 
@@ -186,33 +198,105 @@ export function resolveStoreMercadoPagoCredentials(
   return {
     accessToken,
     publicKey,
-    isTestMode: isTestCredential(accessToken) || isTestCredential(publicKey),
+    isTestMode: testMode,
   }
 }
 
 export function resolvePlatformMercadoPagoCredentials(): MercadoPagoCredentials | null {
+  console.log('========================================')
+  console.log('DEBUG: resolvePlatformMercadoPagoCredentials')
+  console.log('MP_MODE:', process.env.MP_MODE)
+  console.log('NEXT_PUBLIC_MP_MODE:', process.env.NEXT_PUBLIC_MP_MODE)
+  console.log('NODE_ENV:', process.env.NODE_ENV)
+  console.log('isPlatformTestMode:', isPlatformTestMode())
+
+  const testToken = process.env.MP_ACCESS_TOKEN_TEST
+  const testKey = process.env.MP_PUBLIC_KEY_TEST
+  const prodToken = process.env.MP_ACCESS_TOKEN_PROD ?? process.env.MP_ACCESS_TOKEN
+  const prodKey = process.env.MP_PUBLIC_KEY_PROD ?? process.env.NEXT_PUBLIC_MERCADOPAGO_PUBLIC_KEY
+
+  console.log('MP_ACCESS_TOKEN_TEST exists:', !!testToken)
+  console.log('MP_ACCESS_TOKEN_TEST starts with:', maskCredential(testToken))
+  console.log('MP_PUBLIC_KEY_TEST exists:', !!testKey)
+  console.log('MP_PUBLIC_KEY_TEST starts with:', maskCredential(testKey))
+  console.log('MP_ACCESS_TOKEN_PROD exists:', !!prodToken)
+  console.log('MP_ACCESS_TOKEN_PROD starts with:', maskCredential(prodToken))
+  console.log('MP_PUBLIC_KEY_PROD exists:', !!prodKey)
+  console.log('MP_PUBLIC_KEY_PROD starts with:', maskCredential(prodKey))
+
   if (isPlatformTestMode()) {
-    return getPlatformTestCredentials() ?? getPlatformProductionCredentials()
+    console.log('MODE: Using TEST credentials only (no production fallback)')
+    const testCreds = getPlatformTestCredentials()
+    console.log('TEST credentials result:', testCreds ? 'SUCCESS' : 'NULL')
+
+    if (testCreds) {
+      console.log('TEST accessToken starts with:', maskCredential(testCreds.accessToken))
+      console.log('TEST publicKey starts with:', maskCredential(testCreds.publicKey))
+      console.log('TEST isTestMode:', testCreds.isTestMode)
+    }
+
+    return testCreds
   }
 
-  return getPlatformProductionCredentials() ?? getPlatformTestCredentials()
+  console.log('MODE: Using PRODUCTION credentials')
+  const prodCreds = getPlatformProductionCredentials()
+  console.log('PRODUCTION credentials result:', prodCreds ? 'SUCCESS' : 'NULL')
+
+  if (prodCreds) {
+    console.log('PROD accessToken starts with:', maskCredential(prodCreds.accessToken))
+    console.log('PROD publicKey starts with:', maskCredential(prodCreds.publicKey))
+    console.log('PROD isTestMode:', prodCreds.isTestMode)
+  }
+
+  return prodCreds
 }
 
 export function getMercadoPagoInitPoint(
   preference: MercadoPagoPreferenceResponse,
   isTestMode: boolean,
 ): string | null {
-  if (isTestMode && preference.sandbox_init_point) {
-    return preference.sandbox_init_point
+  if (isTestMode) {
+    const sandboxPoint = preference.sandbox_init_point?.trim()
+    console.log('DEBUG getMercadoPagoInitPoint: test mode, sandbox_init_point:', sandboxPoint ?? '(missing)')
+    return sandboxPoint ?? null
   }
 
-  return preference.init_point ?? preference.sandbox_init_point ?? null
+  const productionPoint = preference.init_point?.trim()
+  console.log('DEBUG getMercadoPagoInitPoint: production mode, init_point:', productionPoint ?? '(missing)')
+  return productionPoint ?? null
+}
+
+export function getPlatformAccessTokensForWebhook(): string[] {
+  const tokens: string[] = []
+  const seen = new Set<string>()
+
+  function addToken(rawToken: string | null | undefined) {
+    const token = rawToken?.trim()
+    if (!token || seen.has(token)) {
+      return
+    }
+    seen.add(token)
+    tokens.push(token)
+  }
+
+  if (isPlatformTestMode()) {
+    addToken(process.env.MP_ACCESS_TOKEN_TEST)
+    return tokens
+  }
+
+  addToken(process.env.MP_ACCESS_TOKEN_PROD)
+  addToken(process.env.MP_ACCESS_TOKEN)
+  addToken(process.env.MP_ACCESS_TOKEN_TEST)
+
+  return tokens
 }
 
 export async function createMercadoPagoPreference(
   accessToken: string,
   payload: MercadoPagoPreferencePayload,
 ): Promise<{ data?: MercadoPagoPreferenceResponse; error?: string }> {
+  console.log('DEBUG createMercadoPagoPreference: accessToken starts with:', maskCredential(accessToken))
+
   const response = await fetch('https://api.mercadopago.com/checkout/preferences', {
     method: 'POST',
     headers: {
@@ -231,8 +315,13 @@ export async function createMercadoPagoPreference(
       data.error ??
       'No se pudo crear la preferencia de pago'
 
+    console.error('DEBUG createMercadoPagoPreference: error', errorMessage)
     return { error: errorMessage }
   }
+
+  console.log('DEBUG createMercadoPagoPreference: preference id', data.id)
+  console.log('DEBUG createMercadoPagoPreference: init_point exists:', !!data.init_point)
+  console.log('DEBUG createMercadoPagoPreference: sandbox_init_point exists:', !!data.sandbox_init_point)
 
   return { data }
 }

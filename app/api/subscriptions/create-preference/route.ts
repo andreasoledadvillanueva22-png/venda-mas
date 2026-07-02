@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { resolvePlatformMercadoPagoCredentials } from '@/lib/mercadopago'
 import { createSubscriptionPreference } from '@/lib/subscriptions'
 import { NextRequest, NextResponse } from 'next/server'
 
@@ -82,6 +83,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Tu cuenta no tiene email configurado' }, { status: 400 })
   }
 
+  const credentials = resolvePlatformMercadoPagoCredentials()
+
+  if (!credentials) {
+    return NextResponse.json(
+      { error: 'Credenciales de pago no configuradas para la plataforma' },
+      { status: 500 },
+    )
+  }
+
+  console.log('=== DEBUG subscriptions/create-preference ===')
+  console.log('isTestMode:', credentials.isTestMode)
+  console.log('accessToken starts with:', credentials.accessToken.substring(0, 10))
+
   const result = await createSubscriptionPreference({
     planId,
     userId: user.id,
@@ -95,5 +109,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: result.error }, { status: 502 })
   }
 
-  return NextResponse.json({ initPoint: result.initPoint })
+  console.log('Redirecting to:', result.initPoint)
+  console.log('isTestMode:', credentials.isTestMode)
+
+  return NextResponse.json({ initPoint: result.initPoint, isTestMode: credentials.isTestMode })
 }

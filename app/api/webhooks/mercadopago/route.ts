@@ -2,6 +2,8 @@ import { sendOrderConfirmationEmail } from '@/lib/email'
 import {
   fetchMercadoPagoPayment,
   getMercadoPagoPaymentMetadataValue,
+  getPlatformAccessTokensForWebhook,
+  isPlatformTestMode,
   isSubscriptionPayment,
   type MercadoPagoPayment,
 } from '@/lib/mercadopago'
@@ -79,6 +81,27 @@ function getProductName(products: DbOrderItem['products']): string {
 }
 
 async function getAllAccessTokens(): Promise<string[]> {
+  const tokens: string[] = []
+  const seen = new Set<string>()
+
+  function addToken(rawToken: string | null | undefined) {
+    const token = rawToken?.trim()
+    if (!token || seen.has(token)) {
+      return
+    }
+    seen.add(token)
+    tokens.push(token)
+  }
+
+  for (const token of getPlatformAccessTokensForWebhook()) {
+    addToken(token)
+  }
+
+  if (isPlatformTestMode()) {
+    console.log('[MP Webhook] Modo test: usando solo tokens de plataforma TEST')
+    return tokens
+  }
+
   const admin = createAdminClient()
   const { data: stores, error } = await admin
     .from('stores')
@@ -89,31 +112,8 @@ async function getAllAccessTokens(): Promise<string[]> {
     console.error('[MP Webhook] Error al cargar tokens de tiendas:', error.message)
   }
 
-  const tokens: string[] = []
-  const seen = new Set<string>()
-
   for (const store of stores ?? []) {
-    const token = store.mp_access_token?.trim()
-    if (!token || seen.has(token)) {
-      continue
-    }
-    seen.add(token)
-    tokens.push(token)
-  }
-
-  const platformTokens = [
-    process.env.MP_ACCESS_TOKEN_TEST,
-    process.env.MP_ACCESS_TOKEN_PROD,
-    process.env.MP_ACCESS_TOKEN,
-  ]
-
-  for (const rawToken of platformTokens) {
-    const token = rawToken?.trim()
-    if (!token || seen.has(token)) {
-      continue
-    }
-    seen.add(token)
-    tokens.push(token)
+    addToken(store.mp_access_token)
   }
 
   return tokens

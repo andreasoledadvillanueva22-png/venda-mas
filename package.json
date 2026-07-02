@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:mp": "npx tsx scripts/test-mp-credentials.ts",
     "snyk:test": "snyk test",
     "snyk:monitor": "snyk monitor"
   },
